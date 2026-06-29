@@ -3,7 +3,9 @@ import User from '../models/user.js';
 import Session from '../models/Session.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 import LoginLog from '../models/LoginLog.js';
+import PasswordReset from '../models/PasswordReset.js';
 const isProduction = process.env.NODE_ENV === 'production';
 const refreshCookieOptions = {
   httpOnly:true,
@@ -186,3 +188,170 @@ export const refresh = async (req,res) =>{
     return res.status(500).json({message:'Lỗi hệ thống'})
   }
 }
+
+// Đổi mật khẩu (user đã đăng nhập)
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user._id;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Can nhap mat khau hien tai va mat khau moi' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Mat khau moi phai co it nhat 6 ky tu' });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ message: 'Mat khau moi khong duoc trung voi mat khau hien tai' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Nguoi dung khong ton tai' });
+    }
+
+    const passwordCorrect = await bcrypt.compare(currentPassword, user.hashedPassword);
+    if (!passwordCorrect) {
+      return res.status(401).json({ message: 'Mat khau hien tai khong chinh xac' });
+    }
+
+    user.hashedPassword = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    // Xóa tất cả session khác (buộc đăng nhập lại trên các thiết bị khác)
+    const currentRefreshToken = req.cookies?.refreshToken;
+    if (currentRefreshToken) {
+      await Session.deleteMany({
+        userId,
+        refreshToken: { $ne: currentRefreshToken },
+      });
+    }
+
+    return res.status(200).json({ message: 'Doi mat khau thanh cong' });
+  } catch (error) {
+    console.error('Loi khi doi mat khau', error);
+    return res.status(500).json({ message: 'Loi he thong' });
+  }
+};
+
+// Quên mật khẩu - gửi email reset
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Vui long nhap email' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    // Luôn trả 200 để tránh lộ thông tin email có tồn tại hay không
+    if (!user) {
+      return res.status(200).json({ message: 'Neu email ton tai, chung toi se gui link dat lai mat khau' });
+    }
+
+    if (user.isActive === false) {
+      return res.status(200).json({ message: 'Neu email ton tai, chung toi se gui link dat lai mat khau' });
+    }
+
+    // Xóa các token cũ của user này
+    await PasswordReset.deleteMany({ userId: user._id });
+
+    // Tạo token reset
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    await PasswordReset.create({
+      userId: user._id,
+      token: hashedToken,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 giờ
+    });
+
+    // Gửi email
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const resetUrl = `${clientUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(user.email)}`;
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: user.email,
+      subject: 'Moji - Dat lai mat khau',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #6366f1;">Moji Chat</h2>
+          <p>Xin chao <strong>${user.displayName}</strong>,</p>
+          <p>Chung toi nhan duoc yeu cau dat lai mat khau cho tai khoan cua ban.</p>
+          <p>Nhan vao nut ben duoi de dat lai mat khau:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" style="background-color: #6366f1; color: white; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: bold;">Dat lai mat khau</a>
+          </div>
+          <p style="color: #666; font-size: 14px;">Link nay se het han sau <strong>1 gio</strong>.</p>
+          <p style="color: #666; font-size: 14px;">Neu ban khong yeu cau dat lai mat khau, vui long bo qua email nay.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="color: #999; font-size: 12px;">Moji Chat App</p>
+        </div>
+      `,
+    });
+
+    return res.status(200).json({ message: 'Neu email ton tai, chung toi se gui link dat lai mat khau' });
+  } catch (error) {
+    console.error('Loi khi gui email dat lai mat khau', error);
+    return res.status(500).json({ message: 'Loi he thong. Vui long thu lai sau' });
+  }
+};
+
+// Đặt lại mật khẩu bằng token
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, email, newPassword } = req.body;
+
+    if (!token || !email || !newPassword) {
+      return res.status(400).json({ message: 'Thieu thong tin dat lai mat khau' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Mat khau moi phai co it nhat 6 ky tu' });
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const resetRecord = await PasswordReset.findOne({
+      token: hashedToken,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!resetRecord) {
+      return res.status(400).json({ message: 'Link dat lai mat khau khong hop le hoac da het han' });
+    }
+
+    const user = await User.findById(resetRecord.userId);
+    if (!user || user.email.toLowerCase() !== email.toLowerCase().trim()) {
+      return res.status(400).json({ message: 'Link dat lai mat khau khong hop le' });
+    }
+
+    user.hashedPassword = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    // Xóa tất cả token reset và session cũ
+    await Promise.all([
+      PasswordReset.deleteMany({ userId: user._id }),
+      Session.deleteMany({ userId: user._id }),
+    ]);
+
+    return res.status(200).json({ message: 'Dat lai mat khau thanh cong. Vui long dang nhap lai' });
+  } catch (error) {
+    console.error('Loi khi dat lai mat khau', error);
+    return res.status(500).json({ message: 'Loi he thong' });
+  }
+};

@@ -29,6 +29,8 @@ api.interceptors.response.use(
       requestUrl.includes("/auth/signin") ||
       requestUrl.includes("/auth/signup") ||
       requestUrl.includes("/auth/refresh") ||
+      requestUrl.includes("/auth/forgot-password") ||
+      requestUrl.includes("/auth/reset-password") ||
       !originalRequest
     ) {
       return Promise.reject(error);

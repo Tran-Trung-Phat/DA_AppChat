@@ -640,84 +640,111 @@ const ChatWindowLayout = () => {
                 return participantId !== user?._id && seenUserIds.has(participantId || "");
               });
 
+              const senderId = getSenderId(message);
+              const senderParticipant = selectedConversation.participants.find(
+                (item) => getParticipantId(item) === senderId
+              );
+              const senderAvatar = senderParticipant
+                ? getParticipantAvatar(senderParticipant)
+                : undefined;
+              const senderName = getMessageSenderName(
+                selectedConversation,
+                message,
+                user?._id
+              );
+
               return (
                 <div
                   key={message._id}
                   className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`group flex max-w-[82%] flex-col gap-1 ${
-                      isMine ? "items-end" : "items-start"
+                    className={`group flex max-w-[82%] gap-2 ${
+                      isMine ? "flex-row-reverse" : "flex-row"
                     }`}
                   >
-                    <span className="px-1 text-xs text-muted-foreground">
-                      {getMessageSenderName(
-                        selectedConversation,
-                        message,
-                        user?._id
-                      )}{" "}
-                      · {formatTime(message.createdAt)}
-                      {message.editedAt && !isDeleted ? " · da sua" : ""}
-                    </span>
-                    <div className="flex items-end gap-1">
-                      {isMine && canDelete && (
-                        <div className="flex opacity-0 transition group-hover:opacity-100">
-                          {canEdit && (
+                    {/* Avatar */}
+                    <Avatar className="mt-5 size-8 shrink-0">
+                      <AvatarImage
+                        src={isMine ? user?.avatarUrl : senderAvatar}
+                        alt={senderName}
+                      />
+                      <AvatarFallback className="text-xs">
+                        {initials(senderName)}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    {/* Message content */}
+                    <div
+                      className={`flex flex-col gap-1 ${
+                        isMine ? "items-end" : "items-start"
+                      }`}
+                    >
+                      <span className="px-1 text-xs text-muted-foreground">
+                        {senderName}{" "}
+                        · {formatTime(message.createdAt)}
+                        {message.editedAt && !isDeleted ? " · da sua" : ""}
+                      </span>
+                      <div className="flex items-end gap-1">
+                        {isMine && canDelete && (
+                          <div className="flex opacity-0 transition group-hover:opacity-100">
+                            {canEdit && (
+                              <Button
+                                type="button"
+                                size="icon-xs"
+                                variant="ghost"
+                                onClick={() => startEdit(message)}
+                              >
+                                <PencilIcon />
+                                <span className="sr-only">Sua tin nhan</span>
+                              </Button>
+                            )}
                             <Button
                               type="button"
                               size="icon-xs"
                               variant="ghost"
-                              onClick={() => startEdit(message)}
+                              onClick={() => deleteMessage(message._id)}
                             >
-                              <PencilIcon />
-                              <span className="sr-only">Sua tin nhan</span>
+                              <Trash2Icon />
+                              <span className="sr-only">Thu hoi tin nhan</span>
                             </Button>
-                          )}
-                          <Button
-                            type="button"
-                            size="icon-xs"
-                            variant="ghost"
-                            onClick={() => deleteMessage(message._id)}
-                          >
-                            <Trash2Icon />
-                            <span className="sr-only">Thu hoi tin nhan</span>
-                          </Button>
-                        </div>
-                      )}
-                      <div
-                        className={
-                          sticker && !isDeleted
-                            ? "rounded-lg bg-transparent px-1 py-0 text-5xl leading-none"
-                            : `rounded-lg px-3 py-2 text-sm shadow-sm ${
-                                isMine
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-background text-foreground"
-                              } ${isDeleted ? "italic opacity-75" : ""}`
-                        }
-                      >
-                        {isDeleted ? (
-                          "Tin nhan da duoc thu hoi"
-                        ) : message.type === "location" && message.location ? (
-                          <LocationView location={message.location} />
-                        ) : (
-                          <>
-                            {message.content}
-                            {attachments.map((attachment) => (
-                              <AttachmentView
-                                key={attachment.url}
-                                attachment={attachment}
-                                isMine={isMine}
-                              />
-                            ))}
-                          </>
+                          </div>
                         )}
+                        <div
+                          className={
+                            sticker && !isDeleted
+                              ? "rounded-lg bg-transparent px-1 py-0 text-5xl leading-none"
+                              : `rounded-lg px-3 py-2 text-sm shadow-sm ${
+                                  isMine
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-background text-foreground"
+                                } ${isDeleted ? "italic opacity-75" : ""}`
+                          }
+                        >
+                          {isDeleted ? (
+                            "Tin nhan da duoc thu hoi"
+                          ) : message.type === "location" && message.location ? (
+                            <LocationView location={message.location} />
+                          ) : (
+                            <>
+                              {message.content}
+                              {attachments.map((attachment) => (
+                                <AttachmentView
+                                  key={attachment.url}
+                                  attachment={attachment}
+                                  isMine={isMine}
+                                />
+                              ))}
+                            </>
+                          )}
+                        </div>
                       </div>
+                      {message._id === lastMineMessageId && seenByOthers && (
+                        <span className="px-1 text-xs text-muted-foreground">
+                          Da xem
+                        </span>
+                      )}
                     </div>
-                    {message._id === lastMineMessageId && seenByOthers && (
-                      <span className="px-1 text-xs text-muted-foreground">
-                        Da xem
-                      </span>
-                    )}
                   </div>
                 </div>
               );

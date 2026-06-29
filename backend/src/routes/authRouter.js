@@ -1,17 +1,27 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import {signUp,signIn,signOut,refresh} from '../controllers/authController.js';
+import {
+  signUp,
+  signIn,
+  signOut,
+  refresh,
+  changePassword,
+  forgotPassword,
+  resetPassword,
+} from '../controllers/authController.js';
+import { protectedRoute } from '../middlewares/authMiddleware.js';
 
-const router =express.Router();
+const router = express.Router();
 
+// Public routes
 router.post("/signup", signUp);
-
 router.post("/signin", signIn);
-
 router.post("/signout", signOut);
-
 router.post("/refresh", refresh);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 
+// Protected routes (cần đăng nhập)
+router.post("/change-password", protectedRoute, changePassword);
 
-
-export default router
+export default router;

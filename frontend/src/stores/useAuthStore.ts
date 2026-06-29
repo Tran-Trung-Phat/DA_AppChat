@@ -125,4 +125,19 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ loading: false });
     }
   },
+
+  changePassword: async (currentPassword, newPassword) => {
+    try {
+      set({ loading: true });
+      await authService.changePassword(currentPassword, newPassword);
+      toast.success("Đổi mật khẩu thành công");
+      return true;
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.response?.data?.message || "Không thể đổi mật khẩu");
+      return false;
+    } finally {
+      set({ loading: false });
+    }
+  },
 }));

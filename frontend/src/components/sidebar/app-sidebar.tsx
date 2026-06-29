@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   CheckIcon,
   ImagePlusIcon,
+  KeyRoundIcon,
   LogOutIcon,
   MessageCircleIcon,
   Moon,
@@ -115,7 +116,7 @@ function PersonRow({
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user, signOut, updateProfile, uploadAvatar } = useAuthStore();
+  const { user, signOut, updateProfile, uploadAvatar, changePassword } = useAuthStore();
   const {
     conversations,
     selectedConversationId,
@@ -146,6 +147,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   });
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = React.useState(user?.avatarUrl ?? "");
+  const [passwordOpen, setPasswordOpen] = React.useState(false);
+  const [passwordForm, setPasswordForm] = React.useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
 
   React.useEffect(() => {
     hydrate();
@@ -607,6 +614,96 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     Huy
                   </Button>
                   <Button type="submit">Luu thay doi</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={passwordOpen} onOpenChange={(open) => {
+            setPasswordOpen(open);
+            if (!open) setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+          }}>
+            <DialogTrigger asChild>
+              <Button size="icon-sm" variant="ghost">
+                <KeyRoundIcon />
+                <span className="sr-only">Doi mat khau</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Doi mat khau</DialogTitle>
+              </DialogHeader>
+              <form
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+                    const { toast } = await import("sonner");
+                    toast.error("Mat khau xac nhan khong khop");
+                    return;
+                  }
+                  const ok = await changePassword(
+                    passwordForm.currentPassword,
+                    passwordForm.newPassword
+                  );
+                  if (ok) {
+                    setPasswordOpen(false);
+                    setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div className="space-y-1">
+                  <label htmlFor="currentPassword" className="text-xs font-medium">
+                    Mat khau hien tai
+                  </label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) =>
+                      setPasswordForm((f) => ({ ...f, currentPassword: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="newPassword" className="text-xs font-medium">
+                    Mat khau moi
+                  </label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) =>
+                      setPasswordForm((f) => ({ ...f, newPassword: e.target.value }))
+                    }
+                    minLength={6}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="confirmPassword" className="text-xs font-medium">
+                    Xac nhan mat khau moi
+                  </label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) =>
+                      setPasswordForm((f) => ({ ...f, confirmPassword: e.target.value }))
+                    }
+                    minLength={6}
+                    required
+                  />
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setPasswordOpen(false)}
+                  >
+                    Huy
+                  </Button>
+                  <Button type="submit">Doi mat khau</Button>
                 </DialogFooter>
               </form>
             </DialogContent>

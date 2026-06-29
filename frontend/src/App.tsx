@@ -4,6 +4,7 @@ import SignUpPage from './pages/SignUpPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChatAppPage from './pages/ChatAppPage';
+import FeedPage from './pages/FeedPage';
 import {Toaster} from 'sonner';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminRoute from './components/auth/AdminRoute';
@@ -37,6 +38,7 @@ function App() {
       {/* todo tạo protected route */}
       <Route element={<ProtectedRoute />}>
         <Route path='/' element={<ChatAppPage />} />
+        <Route path='/feed' element={<FeedPage />} />
         <Route element={<AdminRoute />}>
           <Route path='/admin' element={<AdminPage />} />
         </Route>

@@ -250,11 +250,13 @@ const AdminPage = () => {
   const [media, setMedia] = React.useState<AdminMedia[]>([]);
   const [storageBytes, setStorageBytes] = React.useState(0);
   const [audits, setAudits] = React.useState<AdminAudit[]>([]);
+  const [stories, setStories] = React.useState<any[]>([]);
+  const [storyPagination, setStoryPagination] = React.useState(emptyPagination);
   const [query, setQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [confirmAction, setConfirmAction] = React.useState<{
-    type: "user" | "message" | "group";
+    type: "user" | "message" | "group" | "story";
     id: string;
     active?: boolean;
     status?: string;
@@ -316,17 +318,35 @@ const AdminPage = () => {
         setStorageBytes(data.storage.totalBytes);
       }
       if (target === "admins") setAudits(await adminService.getAudits());
+      if (target === "stories") {
+        const data = await adminService.getStories(1, query, statusFilter);
+        setStories(data.stories);
+        setStoryPagination(data.pagination);
+      }
     } catch (error) {
       toast.error(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [query, statusFilter]);
 
   const changeSection = (nextSection: AdminSection) => {
     setSection(nextSection);
-    if (!["overview", "users", "stories", "system"].includes(nextSection)) {
+    if (!["overview", "users", "system"].includes(nextSection)) {
       void loadSection(nextSection);
+    }
+  };
+
+  const searchStories = async (page = 1) => {
+    try {
+      setLoading(true);
+      const data = await adminService.getStories(page, query, statusFilter);
+      setStories(data.stories);
+      setStoryPagination(data.pagination);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -367,6 +387,10 @@ const AdminPage = () => {
           reason
         );
         await loadSection("groups");
+      }
+      if (confirmAction.type === "story") {
+        await adminService.deleteStory(confirmAction.id, reason);
+        await searchStories(storyPagination.page);
       }
       setStats(await adminService.getStats());
       toast.success("Thao tac da duoc cap nhat");
@@ -750,13 +774,161 @@ const AdminPage = () => {
 
             {section === "stories" && (
               <Card>
-                <CardContent className="flex min-h-96 flex-col items-center justify-center text-center">
-                  <ImagesIcon className="mb-4 size-14 text-muted-foreground" />
-                  <CardTitle>Module Story chua duoc kich hoat</CardTitle>
-                  <CardDescription className="mt-2 max-w-lg">
-                    Ung dung Moji hien chua co model va chuc nang Story. Giao dien
-                    kiem duyet da san sang de ket noi khi module Story duoc xay dung.
-                  </CardDescription>
+                <CardHeader className="border-b">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <CardTitle>Danh sách Story</CardTitle>
+                      <CardDescription>{storyPagination.total} tin bài đăng</CardDescription>
+                    </div>
+                  </div>
+                  <form
+                    className="mt-3 flex flex-wrap gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      searchStories(1);
+                    }}
+                  >
+                    <div className="relative min-w-64 flex-1">
+                      <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Tìm theo tên hiển thị, username của người đăng"
+                        className="pl-9"
+                      />
+                    </div>
+                    <select
+                      value={statusFilter}
+                      onChange={(event) => setStatusFilter(event.target.value)}
+                      className="h-9 rounded-lg border bg-background px-3 text-sm"
+                    >
+                      <option value="">Tất cả trạng thái</option>
+                      <option value="active">Đang hoạt động</option>
+                      <option value="expired">Đã hết hạn</option>
+                      <option value="deleted">Đã xóa</option>
+                    </select>
+                    <Button type="submit">Lọc dữ liệu</Button>
+                  </form>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[960px] text-left text-sm">
+                      <thead className="bg-muted/50 text-xs text-muted-foreground">
+                        <tr>
+                          <th className="px-4 py-3">Người đăng</th>
+                          <th className="px-4 py-3">Loại</th>
+                          <th className="px-4 py-3">Nội dung / Preview</th>
+                          <th className="px-4 py-3">Thời gian tạo</th>
+                          <th className="px-4 py-3">Thời gian hết hạn</th>
+                          <th className="px-4 py-3">Trạng thái</th>
+                          <th className="px-4 py-3 text-right">Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {stories.map((story) => {
+                          const isExpired = new Date(story.expiresAt) <= new Date();
+                          const isDeleted = story.status === "deleted";
+                          
+                          let textBg = "";
+                          let storyText = story.content || "";
+                          if (story.mediaType === "text" && story.content) {
+                            const match = story.content.match(/^\[(.*?)\](.*)$/s);
+                            if (match) {
+                              textBg = match[1];
+                              storyText = match[2];
+                            }
+                          }
+
+                          return (
+                            <tr key={story._id} className="hover:bg-muted/30">
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  <Avatar size="sm">
+                                    <AvatarImage src={story.user?.avatarUrl} />
+                                    <AvatarFallback>{initials(story.user?.displayName)}</AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">{story.user?.displayName || "Không rõ"}</p>
+                                    <p className="text-xs text-muted-foreground">@{story.user?.username || "unknown"}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <Badge variant="secondary">
+                                  {story.mediaType === "image" ? "Hình ảnh" : story.mediaType === "video" ? "Video" : "Văn bản"}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 max-w-xs">
+                                <div className="flex items-center gap-2">
+                                  {story.mediaType !== "text" && story.mediaUrl && (
+                                    <div className="size-10 shrink-0 overflow-hidden rounded bg-black flex items-center justify-center">
+                                      {story.mediaType === "video" ? (
+                                        <video src={story.mediaUrl} className="h-full w-full object-cover" />
+                                      ) : (
+                                        <img src={story.mediaUrl} alt="Story preview" className="h-full w-full object-cover" />
+                                      )}
+                                    </div>
+                                  )}
+                                  <p className={`truncate text-xs ${textBg ? `p-1 rounded text-white font-medium ${textBg}` : ""}`}>
+                                    {storyText || "[Không có caption]"}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">{formatDate(story.createdAt)}</td>
+                              <td className="px-4 py-3">{formatDate(story.expiresAt)}</td>
+                              <td className="px-4 py-3">
+                                <Badge variant={isDeleted ? "destructive" : isExpired ? "secondary" : "outline"}>
+                                  {isDeleted ? "Đã xóa" : isExpired ? "Hết hạn" : "Hoạt động"}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex justify-end">
+                                  {!isDeleted && (
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() =>
+                                        setConfirmAction({
+                                          type: "story",
+                                          id: story._id,
+                                          label: "Xóa story vi phạm quy chuẩn",
+                                        })
+                                      }
+                                    >
+                                      Xóa
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-between border-t px-4 py-3">
+                    <span className="text-sm text-muted-foreground">
+                      Trang {storyPagination.page}/{storyPagination.totalPages}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={storyPagination.page <= 1}
+                        onClick={() => searchStories(storyPagination.page - 1)}
+                      >
+                        Trước
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={storyPagination.page >= storyPagination.totalPages}
+                        onClick={() => searchStories(storyPagination.page + 1)}
+                      >
+                        Sau
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}

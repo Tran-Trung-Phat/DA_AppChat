@@ -14,7 +14,15 @@ const conversationPopulate = [
   { path: "lastMessage.senderId", select: USER_SELECT },
 ];
 
-const populateMessage = (message) => message.populate("senderId", USER_SELECT);
+const populateMessage = (message) =>
+  message.populate([
+    { path: "senderId", select: USER_SELECT },
+    {
+      path: "replyTo",
+      populate: { path: "senderId", select: USER_SELECT },
+    },
+    { path: "reactions.userId", select: USER_SELECT },
+  ]);
 
 const mapToObject = (value) => {
   if (!value) return {};
@@ -153,6 +161,10 @@ const createMessage = async ({ req, res, conversation, content, senderId }) => {
     return res.status(400).json({ message: "Can co noi dung hoac tep dinh kem" });
   }
 
+  const replyTo = req.body?.replyTo && mongoose.isValidObjectId(req.body.replyTo)
+    ? req.body.replyTo
+    : undefined;
+
   const message = await Message.create({
     conversationId: conversation._id,
     senderId,
@@ -161,6 +173,7 @@ const createMessage = async ({ req, res, conversation, content, senderId }) => {
     attachments,
     imgUrl: attachments.find((item) => item.kind === "image")?.url,
     location,
+    replyTo: replyTo || null,
   });
 
   updateConversationAfterCreateMessage(conversation, message, senderId);
@@ -382,6 +395,11 @@ export const searchMessages = async (req, res) => {
       content: { $regex: safeQuery, $options: "i" },
     })
       .populate("senderId", USER_SELECT)
+      .populate({
+        path: "replyTo",
+        populate: { path: "senderId", select: USER_SELECT },
+      })
+      .populate("reactions.userId", USER_SELECT)
       .sort({ createdAt: -1 })
       .limit(30);
 
@@ -391,3 +409,63 @@ export const searchMessages = async (req, res) => {
     return res.status(500).json({ message: "Loi he thong" });
   }
 };
+
+export const reactMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user._id;
+
+    if (!mongoose.isValidObjectId(messageId)) {
+      return res.status(400).json({ message: "messageId khong hop le" });
+    }
+
+    if (!emoji || !String(emoji).trim()) {
+      return res.status(400).json({ message: "Emoji khong duoc de trong" });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message || message.deletedAt) {
+      return res.status(404).json({ message: "Khong tim thay tin nhan" });
+    }
+
+    const conversation = await Conversation.findById(message.conversationId);
+    if (!conversation || !isConversationMember(conversation, userId)) {
+      return res.status(403).json({ message: "Ban khong thuoc cuoc tro chuyen nay" });
+    }
+
+    // Toggle/update reaction logic
+    const existingIndex = message.reactions.findIndex(
+      (r) => r.userId.toString() === userId.toString()
+    );
+
+    if (existingIndex > -1) {
+      const existingReaction = message.reactions[existingIndex];
+      if (existingReaction.emoji === emoji) {
+        // Remove reaction
+        message.reactions.splice(existingIndex, 1);
+      } else {
+        // Update reaction emoji
+        message.reactions[existingIndex].emoji = emoji;
+      }
+    } else {
+      // Add reaction
+      message.reactions.push({ userId, emoji });
+    }
+
+    await message.save();
+    await populateMessage(message);
+
+    // Emit socket event to participants
+    emitToConversationParticipants(conversation, "message:updated", {
+      conversationId: conversation._id.toString(),
+      message,
+    });
+
+    return res.status(200).json({ message });
+  } catch (error) {
+    console.error("Loi khi tha cam xuc tin nhan", error);
+    return res.status(500).json({ message: "Loi he thong" });
+  }
+};
+

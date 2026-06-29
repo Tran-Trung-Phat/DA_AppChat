@@ -164,6 +164,11 @@ export const getMessages = async (req, res) => {
 
     let messages = await Message.find(query)
       .populate("senderId", USER_SELECT)
+      .populate({
+        path: "replyTo",
+        populate: { path: "senderId", select: USER_SELECT },
+      })
+      .populate("reactions.userId", USER_SELECT)
       .sort({ createdAt: -1 })
       .limit(pageSize + 1);
 

@@ -12,11 +12,23 @@ import {
   Sun,
   UserPlusIcon,
   XIcon,
+  MoreHorizontalIcon,
+  BanIcon,
+  UserMinusIcon,
+  PlusIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "lucide-react";
 import { Link } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -122,6 +134,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     selectedConversationId,
     friends,
     receivedRequests,
+    sentRequests,
+    blockedUsers,
+    stories,
+    storiesLoading,
+    loading,
     searchResults,
     searchLoading,
     onlineUserIds,
@@ -132,6 +149,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     sendFriendRequest,
     acceptFriendRequest,
     declineFriendRequest,
+    unfriend,
+    cancelFriendRequest,
+    blockUser,
+    unblockUser,
+    fetchBlockedUsers,
+    createStory,
+    viewStory,
   } = useChatStore();
   const [query, setQuery] = React.useState("");
   const [conversationQuery, setConversationQuery] = React.useState("");
@@ -148,11 +172,67 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = React.useState(user?.avatarUrl ?? "");
   const [passwordOpen, setPasswordOpen] = React.useState(false);
+  const [blockedOpen, setBlockedOpen] = React.useState(false);
+  const [createStoryOpen, setCreateStoryOpen] = React.useState(false);
+  const [storyContent, setStoryContent] = React.useState("");
+  const [storyMediaType, setStoryMediaType] = React.useState<"text" | "image" | "video">("text");
+  const [storyFile, setStoryFile] = React.useState<File | null>(null);
+  const [storyFilePreview, setStoryFilePreview] = React.useState("");
+  const [storyBgColor, setStoryBgColor] = React.useState("bg-gradient-to-tr from-purple-500 to-indigo-600");
+  const [viewStoryOpen, setViewStoryOpen] = React.useState(false);
+  const [viewStoryIndex, setViewStoryIndex] = React.useState(0);
   const [passwordForm, setPasswordForm] = React.useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
+
+  const handleCreateStorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (storyMediaType !== "text" && !storyFile) {
+      toast.error("Vui lòng chọn hình ảnh hoặc video cho story");
+      return;
+    }
+    if (storyMediaType === "text" && !storyContent.trim()) {
+      toast.error("Vui lòng nhập nội dung story");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("mediaType", storyMediaType);
+    if (storyFile) {
+      formData.append("media", storyFile);
+    }
+    
+    // Support custom background gradients for text stories
+    if (storyMediaType === "text") {
+      formData.append("content", `[${storyBgColor}]${storyContent}`);
+    } else {
+      formData.append("content", storyContent);
+    }
+
+    const success = await createStory(formData);
+    if (success) {
+      setCreateStoryOpen(false);
+      setStoryContent("");
+      setStoryFile(null);
+      setStoryFilePreview("");
+      setStoryMediaType("text");
+    }
+  };
+
+  const handleStoryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (file) {
+      setStoryFile(file);
+      setStoryFilePreview(URL.createObjectURL(file));
+      if (file.type.startsWith("video/")) {
+        setStoryMediaType("video");
+      } else {
+        setStoryMediaType("image");
+      }
+    }
+  };
 
   React.useEffect(() => {
     hydrate();
@@ -386,6 +466,57 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </>
         )}
 
+        {sentRequests.length > 0 && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel>Lời mời đã gửi</SidebarGroupLabel>
+              <SidebarGroupContent className="space-y-1">
+                {sentRequests.map((request) => (
+                  <PersonRow
+                    key={request._id}
+                    person={request.to}
+                    online={onlineUserIds.includes(request.to._id)}
+                    action={
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        onClick={() => cancelFriendRequest(request._id)}
+                        title="Thu hồi lời mời"
+                      >
+                        <XIcon className="size-3.5 text-muted-foreground hover:text-red-500" />
+                      </Button>
+                    }
+                  />
+                ))}
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
+
+        <SidebarSeparator />
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild className="h-11">
+                  <Link to="/feed">
+                    <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-pink-500 to-orange-400 text-white font-bold text-sm shadow-md">
+                      📰
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate font-semibold">Bảng tin</span>
+                      <span className="truncate text-[10px] text-muted-foreground">
+                        Xem bài đăng, thả tim, bình luận
+                      </span>
+                    </span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         <SidebarSeparator />
         <SidebarGroup>
           <SidebarGroupLabel>Cuộc trò chuyện</SidebarGroupLabel>
@@ -463,14 +594,45 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 person={friend}
                 online={onlineUserIds.includes(friend._id)}
                 action={
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => startDirectConversation(friend._id)}
-                  >
-                    <MessageCircleIcon />
-                    <span className="sr-only">Nhắn tin</span>
-                  </Button>
+                  <div className="flex items-center gap-0.5">
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      onClick={() => startDirectConversation(friend._id)}
+                      title="Nhắn tin"
+                    >
+                      <MessageCircleIcon />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="icon-sm" variant="ghost" title="Tùy chọn">
+                          <MoreHorizontalIcon className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (window.confirm(`Bạn có chắc chắn muốn hủy kết bạn với ${friend.displayName}?`)) {
+                              unfriend(friend._id);
+                            }
+                          }}
+                        >
+                          <UserMinusIcon className="mr-2 size-4 text-red-600" />
+                          <span className="text-red-600">Hủy kết bạn</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (window.confirm(`Bạn có chắc chắn muốn chặn ${friend.displayName}?`)) {
+                              blockUser(friend._id);
+                            }
+                          }}
+                        >
+                          <BanIcon className="mr-2 size-4 text-red-600" />
+                          <span className="text-red-600">Chặn người dùng</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 }
               />
             ))}
@@ -708,6 +870,146 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </form>
             </DialogContent>
           </Dialog>
+          <Dialog open={blockedOpen} onOpenChange={(open) => {
+            setBlockedOpen(open);
+            if (open) {
+              fetchBlockedUsers();
+            }
+          }}>
+            <DialogTrigger asChild>
+              <Button size="icon-sm" variant="ghost" title="Danh sách chặn">
+                <BanIcon className="size-4 text-muted-foreground" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Danh sách người dùng đã chặn</DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto space-y-3 py-2 pr-1">
+                {blockedUsers.map((person) => (
+                  <div key={person._id} className="flex items-center justify-between gap-3 p-1 rounded-lg hover:bg-muted/30">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar>
+                        <AvatarImage src={person.avatarUrl} alt={person.displayName} />
+                        <AvatarFallback>{initials(person.displayName)}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{person.displayName}</p>
+                        <p className="truncate text-xs text-muted-foreground">@{person.username}</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => unblockUser(person._id)}
+                    >
+                      Bỏ chặn
+                    </Button>
+                  </div>
+                ))}
+                {blockedUsers.length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-8">
+                    Chưa chặn người dùng nào
+                  </p>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+          
+          {/* View Story Lightbox Modal */}
+          {viewStoryOpen && stories[viewStoryIndex] && (
+            <Dialog open={viewStoryOpen} onOpenChange={setViewStoryOpen}>
+              <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden bg-black text-white border-none select-none">
+                {/* Story Header */}
+                <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/80 to-transparent p-4 flex items-center justify-between z-50">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="size-9 border-2 border-white/60">
+                      <AvatarImage src={stories[viewStoryIndex].user?.avatarUrl} />
+                      <AvatarFallback className="text-black bg-white">{initials(stories[viewStoryIndex].user?.displayName)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold text-sm">{stories[viewStoryIndex].user?.displayName || "Người dùng"}</p>
+                      <p className="text-[10px] text-white/70">@{stories[viewStoryIndex].user?.username || "unknown"}</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    className="text-white hover:bg-white/20 hover:text-white"
+                    onClick={() => setViewStoryOpen(false)}
+                  >
+                    <XIcon className="size-4" />
+                  </Button>
+                </div>
+
+                {/* Story Content Area */}
+                <div className="flex-1 flex items-center justify-center relative min-h-[420px]">
+                  {/* Previous Story Arrow */}
+                  {viewStoryIndex > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const prevIdx = viewStoryIndex - 1;
+                        setViewStoryIndex(prevIdx);
+                        viewStory(stories[prevIdx]._id);
+                      }}
+                      className="absolute left-3 size-8 rounded-full bg-black/40 flex items-center justify-center hover:bg-black/60 transition-colors z-50 text-white"
+                    >
+                      <ChevronLeftIcon className="size-5" />
+                    </button>
+                  )}
+
+                  {/* Next Story Arrow */}
+                  {viewStoryIndex < stories.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const nextIdx = viewStoryIndex + 1;
+                        setViewStoryIndex(nextIdx);
+                        viewStory(stories[nextIdx]._id);
+                      }}
+                      className="absolute right-3 size-8 rounded-full bg-black/40 flex items-center justify-center hover:bg-black/60 transition-colors z-50 text-white"
+                    >
+                      <ChevronRightIcon className="size-5" />
+                    </button>
+                  )}
+
+                  {/* Story body based on media type */}
+                  {stories[viewStoryIndex].mediaType === "text" ? (
+                    (() => {
+                      const content = stories[viewStoryIndex].content || "";
+                      const match = content.match(/^\[(.*?)\](.*)$/s);
+                      const bg = match ? match[1] : "bg-gradient-to-tr from-purple-500 to-indigo-600";
+                      const text = match ? match[2] : content;
+                      return (
+                        <div className={`w-full h-full min-h-[420px] flex flex-col items-center justify-center p-8 text-center text-lg font-bold ${bg}`}>
+                          {text}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div className="relative w-full h-full min-h-[420px] flex flex-col items-center justify-center bg-zinc-950">
+                      {stories[viewStoryIndex].mediaType === "video" ? (
+                        <video src={stories[viewStoryIndex].mediaUrl} autoPlay controls className="max-h-full max-w-full" />
+                      ) : (
+                        <img src={stories[viewStoryIndex].mediaUrl} alt="Story content" className="max-h-full max-w-full object-contain" />
+                      )}
+                      
+                      {/* Story caption overlay if content exists */}
+                      {stories[viewStoryIndex].content && (
+                        <div className="absolute bottom-4 inset-x-0 px-6 py-3 bg-gradient-to-t from-black/85 via-black/55 to-transparent text-center text-xs font-medium text-white max-h-[30%] overflow-y-auto">
+                          {stories[viewStoryIndex].content}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
           <Button size="icon-sm" variant="ghost" onClick={signOut}>
             <LogOutIcon />
             <span className="sr-only">Đăng xuất</span>

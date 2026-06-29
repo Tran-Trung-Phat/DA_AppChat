@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import { chatService } from "@/services/chatService";
 import { friendService } from "@/services/friendService";
+import { storyService } from "@/services/storyService";
 import { userService } from "@/services/userService";
 import { useAuthStore } from "@/stores/useAuthStore";
 import type {
@@ -10,6 +11,7 @@ import type {
   FriendRequest,
   Message,
   UserSummary,
+  Story,
 } from "@/types/chat";
 
 interface ChatState {
@@ -23,6 +25,9 @@ interface ChatState {
   messageSearchResults: Message[];
   onlineUserIds: string[];
   typingByConversation: Record<string, string[]>;
+  blockedUsers: UserSummary[];
+  stories: Story[];
+  storiesLoading: boolean;
   loading: boolean;
   messagesLoading: boolean;
   sending: boolean;
@@ -36,10 +41,11 @@ interface ChatState {
   markConversationRead: (conversationId: string) => Promise<void>;
   startDirectConversation: (friendId: string) => Promise<void>;
   startGroupConversation: (name: string, memberIds: string[]) => Promise<boolean>;
-  sendMessage: (content: string, attachments?: File[]) => Promise<void>;
+  sendMessage: (content: string, attachments?: File[], replyTo?: string) => Promise<void>;
   sendLocation: (latitude: number, longitude: number) => Promise<boolean>;
   editMessage: (messageId: string, content: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
+  reactMessage: (messageId: string, emoji: string) => Promise<void>;
   receiveSocketMessage: (conversationId: string, message: Message) => void;
   receiveSocketMessageUpdate: (conversationId: string, message: Message) => void;
   receiveSocketConversation: (conversation: Conversation) => void;
@@ -52,6 +58,17 @@ interface ChatState {
   sendFriendRequest: (userId: string, message?: string) => Promise<void>;
   acceptFriendRequest: (requestId: string) => Promise<void>;
   declineFriendRequest: (requestId: string) => Promise<void>;
+  unfriend: (friendId: string) => Promise<void>;
+  cancelFriendRequest: (requestId: string) => Promise<void>;
+  blockUser: (userId: string) => Promise<void>;
+  unblockUser: (userId: string) => Promise<void>;
+  fetchBlockedUsers: () => Promise<void>;
+  fetchStories: () => Promise<void>;
+  createStory: (formData: FormData) => Promise<boolean>;
+  viewStory: (storyId: string) => Promise<void>;
+  likeStory: (storyId: string) => Promise<void>;
+  commentStory: (storyId: string, content: string) => Promise<boolean>;
+  deleteComment: (storyId: string, commentId: string) => Promise<void>;
   updateGroupInfo: (conversationId: string, name: string) => Promise<boolean>;
   addGroupMembers: (conversationId: string, memberIds: string[]) => Promise<boolean>;
   removeGroupMember: (conversationId: string, userId: string) => Promise<boolean>;
@@ -152,6 +169,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   messageSearchResults: [],
   onlineUserIds: [],
   typingByConversation: {},
+  blockedUsers: [],
+  stories: [],
+  storiesLoading: false,
   loading: false,
   messagesLoading: false,
   sending: false,
@@ -161,10 +181,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   hydrate: async () => {
     try {
       set({ loading: true });
-      const [conversations, friends, requests] = await Promise.all([
-        chatService.getConversations(),
-        friendService.getFriends(),
-        friendService.getRequests(),
+
+      const fetchSafely = async <T>(promise: Promise<T>, fallback: T): Promise<T> => {
+        try {
+          return await promise;
+        } catch (e) {
+          console.error("Lỗi tải dữ liệu trong hydrate:", e);
+          return fallback;
+        }
+      };
+
+      const [conversations, friends, requests, blockedUsers, stories] = await Promise.all([
+        fetchSafely(chatService.getConversations(), []),
+        fetchSafely(friendService.getFriends(), []),
+        fetchSafely(friendService.getRequests(), { sent: [], received: [] }),
+        fetchSafely(friendService.getBlockedUsers(), []),
+        fetchSafely(storyService.getStories(), []),
       ]);
 
       const currentId = get().selectedConversationId;
@@ -178,6 +210,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         friends,
         sentRequests: requests.sent,
         receivedRequests: requests.received,
+        blockedUsers,
+        stories,
         selectedConversationId,
       });
 
@@ -185,7 +219,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         await get().selectConversation(selectedConversationId);
       }
     } catch (error) {
-      toast.error(getErrorMessage(error, "Không thể tải dữ liệu chat"));
+      toast.error("Không thể tải dữ liệu chat");
     } finally {
       set({ loading: false });
     }
@@ -272,7 +306,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
-  sendMessage: async (content, attachments = []) => {
+  sendMessage: async (content, attachments = [], replyTo) => {
     const text = content.trim();
     const conversationId = get().selectedConversationId;
     const conversation = get().conversations.find(
@@ -285,8 +319,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       set({ sending: true });
       const message =
         conversation.type === "group"
-          ? await chatService.sendGroupMessage(conversationId, text, attachments)
-          : await chatService.sendDirectMessage(conversationId, text, attachments);
+          ? await chatService.sendGroupMessage(conversationId, text, attachments, replyTo)
+          : await chatService.sendDirectMessage(conversationId, text, attachments, replyTo);
 
       set((state) => ({ messages: appendMessageOnce(state.messages, message) }));
       await get().refreshConversations();
@@ -347,6 +381,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       await get().refreshConversations();
     } catch (error) {
       toast.error(getErrorMessage(error, "Khong the thu hoi tin nhan"));
+    }
+  },
+
+  reactMessage: async (messageId, emoji) => {
+    try {
+      const message = await chatService.reactMessage(messageId, emoji);
+      set((state) => ({
+        messages: replaceMessage(state.messages, message),
+        messageSearchResults: replaceMessage(state.messageSearchResults, message),
+      }));
+      await get().refreshConversations();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể phản hồi cảm xúc"));
     }
   },
 
@@ -576,6 +623,162 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     } catch (error) {
       toast.error(getErrorMessage(error, "Khong the roi nhom"));
       return false;
+    }
+  },
+
+  unfriend: async (friendId) => {
+    try {
+      await friendService.unfriend(friendId);
+      set((state) => ({
+        friends: state.friends.filter((f) => f._id !== friendId),
+      }));
+      toast.success("Đã hủy kết bạn");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể hủy kết bạn"));
+    }
+  },
+
+  cancelFriendRequest: async (requestId) => {
+    try {
+      await friendService.cancelRequest(requestId);
+      set((state) => ({
+        sentRequests: state.sentRequests.filter((r) => r._id !== requestId),
+      }));
+      toast.success("Đã hủy lời mời kết bạn");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể hủy lời mời kết bạn"));
+    }
+  },
+
+  blockUser: async (userId) => {
+    try {
+      await friendService.blockUser(userId);
+      set((state) => ({
+        friends: state.friends.filter((f) => f._id !== userId),
+        sentRequests: state.sentRequests.filter((r) => r.to._id !== userId),
+        receivedRequests: state.receivedRequests.filter((r) => r.from._id !== userId),
+      }));
+      await get().fetchBlockedUsers();
+      toast.success("Đã chặn người dùng");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể chặn người dùng"));
+    }
+  },
+
+  unblockUser: async (userId) => {
+    try {
+      await friendService.unblockUser(userId);
+      set((state) => ({
+        blockedUsers: state.blockedUsers.filter((u) => u._id !== userId),
+      }));
+      toast.success("Đã bỏ chặn người dùng");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể bỏ chặn"));
+    }
+  },
+
+  fetchBlockedUsers: async () => {
+    try {
+      const blockedUsers = await friendService.getBlockedUsers();
+      set({ blockedUsers });
+    } catch (error) {
+      console.error("Lỗi khi tải danh sách chặn", error);
+    }
+  },
+
+  fetchStories: async () => {
+    try {
+      set({ storiesLoading: true });
+      const stories = await storyService.getStories();
+      set({ stories, storiesLoading: false });
+    } catch (error) {
+      set({ storiesLoading: false });
+      console.error("Lỗi khi tải story:", error);
+    }
+  },
+
+  createStory: async (formData) => {
+    try {
+      set({ loading: true });
+      const story = await storyService.createStory(formData);
+      set((state) => ({
+        stories: [story, ...state.stories],
+        loading: false,
+      }));
+      toast.success("Đã đăng story thành công");
+      return true;
+    } catch (error) {
+      set({ loading: false });
+      toast.error(getErrorMessage(error, "Không thể đăng story"));
+      return false;
+    }
+  },
+
+  viewStory: async (storyId) => {
+    try {
+      await storyService.viewStory(storyId);
+      const currentUserId = useAuthStore.getState().user?._id;
+      if (currentUserId) {
+        set((state) => ({
+          stories: state.stories.map((s) => {
+            if (s._id === storyId && s.views && !s.views.includes(currentUserId)) {
+              return { ...s, views: [...s.views, currentUserId] };
+            }
+            return s;
+          }),
+        }));
+      }
+    } catch (error) {
+      console.error("Lỗi khi xem story:", error);
+    }
+  },
+
+  likeStory: async (storyId) => {
+    try {
+      const likes = await storyService.likeStory(storyId);
+      set((state) => ({
+        stories: state.stories.map((s) =>
+          s._id === storyId ? { ...s, likes } : s
+        ),
+      }));
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể thả tim bài viết"));
+    }
+  },
+
+  commentStory: async (storyId, content) => {
+    try {
+      const comment = await storyService.commentStory(storyId, content);
+      set((state) => ({
+        stories: state.stories.map((s) =>
+          s._id === storyId
+            ? { ...s, comments: [...s.comments, comment] }
+            : s
+        ),
+      }));
+      return true;
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể bình luận"));
+      return false;
+    }
+  },
+
+  deleteComment: async (storyId, commentId) => {
+    try {
+      await storyService.deleteComment(storyId, commentId);
+      set((state) => ({
+        stories: state.stories.map((s) =>
+          s._id === storyId
+            ? {
+                ...s,
+                comments: s.comments.filter((c) => c._id !== commentId),
+              }
+            : s
+        ),
+      }));
+      toast.success("Đã xóa bình luận");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể xóa bình luận"));
     }
   },
 }));

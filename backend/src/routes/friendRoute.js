@@ -6,6 +6,11 @@ import {
   declineFriendRequest,
   getAllFriends,
   getFriendRequests,
+  unfriend,
+  cancelFriendRequest,
+  blockUser,
+  unblockUser,
+  getBlockedUsers,
 
 } from '../controllers/friendController.js';
 
@@ -17,8 +22,18 @@ router.post('/request/:requestId/accept',acceptFriendRequest);
 
 router.post('/request/:requestId/decline',declineFriendRequest);
 
+router.delete('/request/:requestId/cancel', cancelFriendRequest);
+
+router.delete('/:friendId', unfriend);
+
 router.get('/',getAllFriends);
 
 router.get('/requests',getFriendRequests);
+
+router.get('/blocked', getBlockedUsers);
+
+router.post('/block/:userId', blockUser);
+
+router.post('/unblock/:userId', unblockUser);
 
 export default router;

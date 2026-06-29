@@ -6,6 +6,8 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import ChatWindowLayout from '@/components/chat/ChatWindowLayout';
+import CallOverlay from '@/components/chat/CallOverlay';
+import { useCallStore } from '@/stores/useCallStore';
 import { Separator } from '@/components/ui/separator';
 import { socketService } from '@/services/socketService';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -71,6 +73,34 @@ const ChatAppPage = () => {
       setTyping(conversationId, userId, false);
     });
 
+    socket.on("call:incoming", ({ fromUserId, fromUser, signalData, callType }) => {
+      useCallStore.getState().handleIncomingCall(fromUserId, fromUser, signalData, callType);
+    });
+
+    socket.on("call:accepted", ({ signalData }) => {
+      void useCallStore.getState().handleCallAccepted(signalData);
+    });
+
+    socket.on("call:declined", () => {
+      useCallStore.getState().handleCallDeclined();
+    });
+
+    socket.on("call:ice-candidate", ({ candidate }) => {
+      void useCallStore.getState().handleIceCandidate(candidate);
+    });
+
+    socket.on("call:ended", () => {
+      useCallStore.getState().handleCallEnded();
+    });
+
+    socket.on("call:busied", () => {
+      useCallStore.getState().handleCallDeclined();
+    });
+
+    socket.on("call:failed", ({ reason }) => {
+      useCallStore.getState().handleCallFailed(reason);
+    });
+
     return () => {
       socket.off("message:new");
       socket.off("message:updated");
@@ -81,6 +111,13 @@ const ChatAppPage = () => {
       socket.off("presence:changed");
       socket.off("typing:start");
       socket.off("typing:stop");
+      socket.off("call:incoming");
+      socket.off("call:accepted");
+      socket.off("call:declined");
+      socket.off("call:ice-candidate");
+      socket.off("call:ended");
+      socket.off("call:busied");
+      socket.off("call:failed");
       socketService.disconnect();
     };
   }, [
@@ -122,6 +159,7 @@ const ChatAppPage = () => {
           <ChatWindowLayout />
         </main>
       </SidebarInset>
+      <CallOverlay />
     </SidebarProvider>
   );
 };

@@ -2,6 +2,7 @@ import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import Session from "../models/Session.js";
 import User from "../models/user.js";
+import Story from "../models/Story.js";
 import { disconnectUserSockets } from "../libs/socket.js";
 import { getOnlineUserIds } from "../libs/socket.js";
 import AdminAudit from "../models/AdminAudit.js";
@@ -9,6 +10,7 @@ import Friend from "../models/Friend.js";
 import LoginLog from "../models/LoginLog.js";
 import Report from "../models/Report.js";
 import SystemNotification from "../models/SystemNotification.js";
+import mongoose from "mongoose";
 
 const USER_FIELDS =
   "_id username email displayName avatarUrl bio phone role adminRole isActive banReason reportCount createdAt updatedAt";
@@ -458,4 +460,92 @@ export const getAdminAudits = async (_req, res) => {
     .limit(100)
     .lean();
   return res.json({ audits });
+};
+
+export const getAdminStories = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const searchQuery = req.query.q || "";
+    const statusFilter = req.query.status || ""; // 'active', 'expired', 'deleted'
+    
+    const skip = (page - 1) * limit;
+
+    const queryConditions = {};
+
+    // Filter by status
+    if (statusFilter === "deleted") {
+      queryConditions.status = "deleted";
+    } else if (statusFilter === "expired") {
+      queryConditions.status = "active";
+      queryConditions.expiresAt = { $lte: new Date() };
+    } else if (statusFilter === "active") {
+      queryConditions.status = "active";
+      queryConditions.expiresAt = { $gt: new Date() };
+    }
+
+    // Search query for creator's displayName/username/email
+    if (searchQuery.trim()) {
+      const matchingUsers = await User.find({
+        $or: [
+          { displayName: { $regex: searchQuery, $options: "i" } },
+          { username: { $regex: searchQuery, $options: "i" } },
+          { email: { $regex: searchQuery, $options: "i" } }
+        ]
+      }).select("_id");
+      
+      const userIds = matchingUsers.map(u => u._id);
+      queryConditions.user = { $in: userIds };
+    }
+
+    const totalStories = await Story.countDocuments(queryConditions);
+    const totalPages = Math.ceil(totalStories / limit);
+
+    const stories = await Story.find(queryConditions)
+      .populate("user", "_id displayName username avatarUrl email")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    return res.status(200).json({
+      stories,
+      pagination: {
+        page,
+        limit,
+        total: totalStories,
+        totalPages,
+      }
+    });
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách story admin:", error);
+    return res.status(500).json({ message: "Lỗi hệ thống khi lấy story" });
+  }
+};
+
+export const deleteAdminStory = async (req, res) => {
+  try {
+    const { storyId } = req.params;
+    const { reason } = req.body;
+
+    if (!mongoose.isValidObjectId(storyId)) {
+      return res.status(400).json({ message: "ID story không hợp lệ" });
+    }
+
+    const story = await Story.findById(storyId);
+    if (!story) {
+      return res.status(404).json({ message: "Không tìm thấy story" });
+    }
+
+    // Mark as deleted
+    story.status = "deleted";
+    await story.save();
+
+    await writeAudit(req, "delete_story", "story", storyId, reason || "Vi phạm quy chuẩn cộng đồng");
+
+    return res.status(200).json({ message: "Đã xóa story thành công", story });
+  } catch (error) {
+    console.error("Lỗi khi xóa story admin:", error);
+    return res.status(500).json({ message: "Lỗi hệ thống khi xóa story" });
+  }
 };

@@ -5,7 +5,8 @@ import {
   revokeMessage,
   searchMessages,
   sendDirectMessage,
-  sendGroupMessage
+  sendGroupMessage,
+  reactMessage
 
 } from '../controllers/messageController.js';
 import { checkFriendship, checkGroupMembership } from '../middlewares/friendMiddleware.js';
@@ -17,6 +18,7 @@ router.get('/search', searchMessages);
 router.post('/direct', uploadMessageAttachments, checkFriendship, sendDirectMessage);
 router.post('/group', uploadMessageAttachments, checkGroupMembership, sendGroupMessage);
 router.patch('/:messageId', editMessage);
+router.patch('/:messageId/react', reactMessage);
 router.delete('/:messageId', revokeMessage);
 
 export default router;

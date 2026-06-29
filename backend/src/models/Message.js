@@ -107,6 +107,24 @@ const messageSchema = new mongoose.Schema({
   location: {
     type: locationSchema,
   },
+  replyTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Message",
+    default: null,
+  },
+  reactions: [
+    {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+      emoji: {
+        type: String,
+        required: true,
+      },
+    },
+  ],
   editedAt: {
     type: Date,
     default: null,

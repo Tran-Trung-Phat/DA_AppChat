@@ -104,6 +104,60 @@ export const initSocket = (httpServer) => {
       }
     });
 
+    socket.on("call:initiate", async ({ toUserId, signalData, callType }) => {
+      if (!toUserId) return;
+      
+      const isOnline = onlineUsers.has(toUserId);
+      if (!isOnline) {
+        socket.emit("call:failed", { reason: "offline" });
+        return;
+      }
+
+      try {
+        const caller = await User.findById(socket.userId).select("displayName avatarUrl username");
+        if (!caller) return;
+        
+        io.to(userRoom(toUserId)).emit("call:incoming", {
+          fromUserId: socket.userId,
+          fromUser: {
+            _id: caller._id,
+            displayName: caller.displayName,
+            avatarUrl: caller.avatarUrl,
+            username: caller.username,
+          },
+          signalData,
+          callType,
+        });
+      } catch (err) {
+        console.error("Lỗi khi khởi tạo cuộc gọi socket:", err);
+      }
+    });
+
+    socket.on("call:accept", ({ toUserId, signalData }) => {
+      if (!toUserId) return;
+      io.to(userRoom(toUserId)).emit("call:accepted", { signalData });
+    });
+
+    socket.on("call:decline", ({ toUserId }) => {
+      if (!toUserId) return;
+      io.to(userRoom(toUserId)).emit("call:declined");
+    });
+
+    socket.on("call:ice-candidate", ({ toUserId, candidate }) => {
+      if (!toUserId) return;
+      io.to(userRoom(toUserId)).emit("call:ice-candidate", { candidate });
+    });
+
+    socket.on("call:end", ({ toUserId }) => {
+      if (!toUserId) return;
+      io.to(userRoom(toUserId)).emit("call:ended");
+    });
+
+    socket.on("call:busy", ({ toUserId }) => {
+      if (!toUserId) return;
+      io.to(userRoom(toUserId)).emit("call:busied");
+    });
+
     socket.on("disconnect", () => {
       if (removeOnlineSocket(socket.userId, socket.id)) {
         io.emit("presence:changed", {

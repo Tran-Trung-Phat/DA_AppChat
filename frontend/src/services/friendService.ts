@@ -28,4 +28,29 @@ export const friendService = {
   declineRequest: async (requestId: string) => {
     await api.post(`/friends/request/${requestId}/decline`);
   },
+
+  cancelRequest: async (requestId: string) => {
+    const res = await api.delete(`/friends/request/${requestId}/cancel`);
+    return res.data;
+  },
+
+  unfriend: async (friendId: string) => {
+    const res = await api.delete(`/friends/${friendId}`);
+    return res.data;
+  },
+
+  blockUser: async (userId: string) => {
+    const res = await api.post(`/friends/block/${userId}`);
+    return res.data;
+  },
+
+  unblockUser: async (userId: string) => {
+    const res = await api.post(`/friends/unblock/${userId}`);
+    return res.data;
+  },
+
+  getBlockedUsers: async () => {
+    const res = await api.get<{ blockedUsers: UserSummary[] }>("/friends/blocked");
+    return res.data.blockedUsers;
+  },
 };

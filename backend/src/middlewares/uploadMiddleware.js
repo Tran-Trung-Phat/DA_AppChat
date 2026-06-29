@@ -77,3 +77,35 @@ export const uploadMessageAttachments = (req, res, next) => {
     return res.status(400).json({ message: error.message || "Upload tep that bai" });
   });
 };
+
+const storyDir = path.join(__dirname, "../../uploads/stories");
+fs.mkdirSync(storyDir, { recursive: true });
+
+const storyStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, storyDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${req.user._id}-story-${Date.now()}${ext}`);
+  },
+});
+
+export const uploadStoryFile = multer({
+  storage: storyStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+  },
+});
+
+export const uploadSingleStoryMedia = (req, res, next) => {
+  uploadStoryFile.single("media")(req, res, (error) => {
+    if (!error) return next();
+
+    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ message: "File đính kèm story tối đa 10MB" });
+    }
+
+    return res.status(400).json({ message: error.message || "Upload file story thất bại" });
+  });
+};

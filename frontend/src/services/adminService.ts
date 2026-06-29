@@ -120,4 +120,21 @@ export const adminService = {
     const res = await api.get("/admin/audits");
     return res.data.audits;
   },
+
+  getStories: async (page = 1, query = "", statusFilter = "") => {
+    const res = await api.get<{
+      stories: any[];
+      pagination: AdminPagination;
+    }>("/admin/stories", {
+      params: { page, q: query, status: statusFilter || undefined, limit: 20 },
+    });
+    return res.data;
+  },
+
+  deleteStory: async (storyId: string, reason: string) => {
+    const res = await api.delete(`/admin/stories/${storyId}`, {
+      data: { reason },
+    });
+    return res.data.story;
+  },
 };

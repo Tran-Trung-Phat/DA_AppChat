@@ -71,19 +71,47 @@ export interface MessageLocation {
   mapUrl: string;
 }
 
+export interface MessageReaction {
+  userId: UserSummary;
+  emoji: string;
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
-  senderId: UserSummary | string;
+  senderId: UserSummary;
   type?: "text" | "location";
   content?: string;
   imgUrl?: string;
   attachments?: MessageAttachment[];
   location?: MessageLocation;
+  replyTo?: Message | null;
+  reactions?: MessageReaction[];
   editedAt?: string | null;
   deletedAt?: string | null;
   createdAt: string;
   updatedAt?: string;
   status?: "active" | "locked" | "deleted";
   lockedReason?: string;
+}
+
+export interface StoryComment {
+  _id: string;
+  user: UserSummary;
+  content: string;
+  createdAt: string;
+}
+
+export interface Story {
+  _id: string;
+  user: UserSummary;
+  mediaUrl?: string;
+  mediaType: "image" | "video" | "text";
+  content?: string;
+  views?: string[];
+  likes: string[];
+  comments: StoryComment[];
+  status: "active" | "deleted";
+  createdAt: string;
+  expiresAt: string;
 }

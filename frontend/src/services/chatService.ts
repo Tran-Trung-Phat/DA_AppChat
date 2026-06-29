@@ -41,12 +41,16 @@ export const chatService = {
   sendDirectMessage: async (
     conversationId: string,
     content: string,
-    attachments: File[] = []
+    attachments: File[] = [],
+    replyTo?: string
   ) => {
     if (attachments.length > 0) {
       const formData = new FormData();
       formData.append("conversationId", conversationId);
       formData.append("content", content);
+      if (replyTo) {
+        formData.append("replyTo", replyTo);
+      }
       attachments.forEach((file) => formData.append("attachments", file));
 
       const res = await api.post<{ message: Message }>("/messages/direct", formData, {
@@ -61,6 +65,7 @@ export const chatService = {
       {
         conversationId,
         content,
+        replyTo,
       }
     );
 
@@ -70,12 +75,16 @@ export const chatService = {
   sendGroupMessage: async (
     conversationId: string,
     content: string,
-    attachments: File[] = []
+    attachments: File[] = [],
+    replyTo?: string
   ) => {
     if (attachments.length > 0) {
       const formData = new FormData();
       formData.append("conversationId", conversationId);
       formData.append("content", content);
+      if (replyTo) {
+        formData.append("replyTo", replyTo);
+      }
       attachments.forEach((file) => formData.append("attachments", file));
 
       const res = await api.post<{ message: Message }>("/messages/group", formData, {
@@ -88,6 +97,7 @@ export const chatService = {
     const res = await api.post<{ message: Message }>("/messages/group", {
       conversationId,
       content,
+      replyTo,
     });
     return res.data.message;
   },
@@ -118,6 +128,13 @@ export const chatService = {
 
   deleteMessage: async (messageId: string) => {
     const res = await api.delete<{ message: Message }>(`/messages/${messageId}`);
+    return res.data.message;
+  },
+
+  reactMessage: async (messageId: string, emoji: string) => {
+    const res = await api.patch<{ message: Message }>(`/messages/${messageId}/react`, {
+      emoji,
+    });
     return res.data.message;
   },
 

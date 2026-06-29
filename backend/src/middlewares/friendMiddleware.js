@@ -1,5 +1,6 @@
 import Friend from "../models/Friend.js";
 import Conversation from "../models/Conversation.js";
+import User from "../models/user.js";
 import mongoose from "mongoose";
 
 const pair = (a, b) => (a < b ? [a, b] : [b, a]);
@@ -63,6 +64,23 @@ export const checkFriendship = async (req, res, next) => {
         return res.status(400).json({ message: "Can cung cap thanh vien khac" });
       }
 
+      // Check block list for all members in group creation
+      const blockChecks = await Promise.all(
+        uniqueMemberIds.map(async (memberId) => {
+          const [blockedTarget, blockedMe] = await Promise.all([
+            User.exists({ _id: memberId, blockList: me }),
+            User.exists({ _id: me, blockList: memberId }),
+          ]);
+          return blockedTarget || blockedMe;
+        })
+      );
+
+      if (blockChecks.some((isBlocked) => isBlocked)) {
+        return res.status(403).json({
+          message: "Một hoặc nhiều thành viên đã chặn bạn hoặc bị bạn chặn",
+        });
+      }
+
       const friendshipChecks = await Promise.all(
         uniqueMemberIds.map((memberId) => {
           const [userA, userB] = pair(me, memberId);
@@ -77,6 +95,16 @@ export const checkFriendship = async (req, res, next) => {
       }
 
       return next();
+    }
+
+    // Check block list status for direct chat
+    const [isBlocked, hasBlocked] = await Promise.all([
+      User.exists({ _id: recipientId, blockList: me }),
+      User.exists({ _id: me, blockList: recipientId }),
+    ]);
+
+    if (isBlocked || hasBlocked) {
+      return res.status(403).json({ message: "Không thể nhắn tin do trạng thái chặn giữa hai người dùng" });
     }
 
     const [userA, userB] = pair(me, recipientId);

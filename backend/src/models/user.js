@@ -60,7 +60,12 @@ const schema = new mongoose.Schema({
   reportCount: {
     type: Number,
     default: 0,
-  }
+  },
+  blockList: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    index: true,
+  }]
 },{
   timestamps:true,
 }

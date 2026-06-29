@@ -14,6 +14,8 @@ import {
   createAdminNotification,
   getAdminMedia,
   getAdminAudits,
+  getAdminStories,
+  deleteAdminStory,
 } from "../controllers/adminController.js";
 import {
   requireAdmin,
@@ -37,7 +39,7 @@ router.get("/notifications", requireAdminPermission("notifications"), getAdminNo
 router.post("/notifications", requireAdminPermission("notifications"), createAdminNotification);
 router.get("/media", requireAdminPermission("media"), getAdminMedia);
 router.get("/audits", requireAdminPermission("admins"), getAdminAudits);
+router.get("/stories", requireAdminPermission("stories"), getAdminStories);
+router.delete("/stories/:storyId", requireAdminPermission("stories"), deleteAdminStory);
 
 export default router;
-
-

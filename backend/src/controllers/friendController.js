@@ -24,6 +24,15 @@ export const sendFriendRequest = async (req, res) =>{
       return res.status(404).json({message:'Người dùng không tồn tại'})
     }
 
+    const [isBlocked, hasBlocked] = await Promise.all([
+      User.exists({ _id: to, blockList: from }),
+      User.exists({ _id: from, blockList: to })
+    ]);
+
+    if (isBlocked || hasBlocked) {
+      return res.status(403).json({ message: "Không thể gửi lời mời kết bạn do trạng thái chặn giữa hai người dùng" });
+    }
+
     let userA = from.toString();
     let userB = to.toString();
 
@@ -192,10 +201,136 @@ export const getFriendRequests = async (req, res) =>{
       FriendRequest.find({to: userId}).populate("from", populateFields),
     ])
     res.status(200).json({sent,received})
-
-
   }catch(error){
     console.error('Lỗi khi lấy danh sách yêu cầu kết bạn',error);
     return res.status(500).json({message:'Lỗi hệ thống'})
   }
 }
+
+export const unfriend = async (req, res) => {
+  try {
+    const { friendId } = req.params;
+    const userId = req.user._id;
+
+    if (!mongoose.isValidObjectId(friendId)) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ" });
+    }
+
+    let userA = userId.toString();
+    let userB = friendId.toString();
+    if (userA > userB) {
+      [userA, userB] = [userB, userA];
+    }
+
+    const deletedFriend = await Friend.findOneAndDelete({ userA, userB });
+    if (!deletedFriend) {
+      return res.status(404).json({ message: "Hai người chưa là bạn bè" });
+    }
+
+    return res.status(200).json({ message: "Hủy kết bạn thành công" });
+  } catch (error) {
+    console.error("Lỗi khi hủy kết bạn", error);
+    return res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
+export const cancelFriendRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const userId = req.user._id;
+
+    if (!mongoose.isValidObjectId(requestId)) {
+      return res.status(400).json({ message: "ID lời mời không hợp lệ" });
+    }
+
+    const request = await FriendRequest.findById(requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Không tìm thấy lời mời kết bạn" });
+    }
+
+    if (request.from.toString() !== userId.toString()) {
+      return res.status(403).json({ message: "Bạn không thể hủy lời mời này" });
+    }
+
+    await FriendRequest.findByIdAndDelete(requestId);
+    return res.status(200).json({ message: "Hủy lời mời kết bạn thành công" });
+  } catch (error) {
+    console.error("Lỗi khi hủy lời mời kết bạn", error);
+    return res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
+export const blockUser = async (req, res) => {
+  try {
+    const { userId: targetUserId } = req.params;
+    const userId = req.user._id;
+
+    if (!mongoose.isValidObjectId(targetUserId)) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ" });
+    }
+
+    if (userId.toString() === targetUserId.toString()) {
+      return res.status(400).json({ message: "Không thể tự chặn chính mình" });
+    }
+
+    // Add to block list if not already there
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { blockList: targetUserId }
+    });
+
+    // Remove friendship if exists
+    let userA = userId.toString();
+    let userB = targetUserId.toString();
+    if (userA > userB) {
+      [userA, userB] = [userB, userA];
+    }
+    await Friend.findOneAndDelete({ userA, userB });
+
+    // Remove any pending friend requests
+    await FriendRequest.deleteMany({
+      $or: [
+        { from: userId, to: targetUserId },
+        { from: targetUserId, to: userId }
+      ]
+    });
+
+    return res.status(200).json({ message: "Chặn người dùng thành công" });
+  } catch (error) {
+    console.error("Lỗi khi chặn người dùng", error);
+    return res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
+export const unblockUser = async (req, res) => {
+  try {
+    const { userId: targetUserId } = req.params;
+    const userId = req.user._id;
+
+    if (!mongoose.isValidObjectId(targetUserId)) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ" });
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      $pull: { blockList: targetUserId }
+    });
+
+    return res.status(200).json({ message: "Bỏ chặn người dùng thành công" });
+  } catch (error) {
+    console.error("Lỗi khi bỏ chặn người dùng", error);
+    return res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
+export const getBlockedUsers = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId)
+      .populate("blockList", "_id username displayName email avatarUrl")
+      .lean();
+
+    return res.status(200).json({ blockedUsers: user?.blockList || [] });
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách chặn", error);
+    return res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};

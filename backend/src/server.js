@@ -10,6 +10,7 @@ import friendRoute from './routes/friendRoute.js';
 import messageRoute from './routes/messageRoute.js';
 import conversationRoute from './routes/conversationRoute.js';
 import adminRoute from './routes/adminRoute.js';
+import storyRoute from './routes/storyRoute.js';
 import cookieParser from 'cookie-parser';
 import { protectedRoute } from './middlewares/authMiddleware.js';
 import cors from 'cors';
@@ -41,6 +42,7 @@ app.use('/api/friends',friendRoute);
 app.use('/api/messages',messageRoute);
 app.use('/api/conversations', conversationRoute);
 app.use('/api/admin', adminRoute);
+app.use('/api/stories', storyRoute);
 
 
 connectDB().then(() =>{

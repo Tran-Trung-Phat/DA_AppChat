@@ -21,7 +21,11 @@ import {
   UserPlusIcon,
   UsersIcon,
   XIcon,
+  CornerUpLeft,
+  PhoneIcon,
+  VideoIcon,
 } from "lucide-react";
+import { useCallStore } from "@/stores/useCallStore";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -255,13 +259,72 @@ function LocationView({ location }: { location: MessageLocation }) {
   );
 }
 
+const ReactionPicker = ({
+  messageId,
+  currentReactions,
+  userId,
+  reactMessage,
+}: {
+  messageId: string;
+  currentReactions?: any[];
+  userId?: string;
+  reactMessage: (messageId: string, emoji: string) => Promise<void>;
+}) => {
+  const [open, setOpen] = React.useState(false);
+  const emojis = ["👍", "❤️", "😂", "😮", "😢", "😡"];
+  
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          size="icon-xs"
+          variant="ghost"
+          className="hover:text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label="Phan hoi cam xuc"
+        >
+          <SmileIcon className="size-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="center"
+        className="w-auto p-1 bg-background border rounded-full shadow-md flex gap-0.5"
+      >
+        {emojis.map((emoji) => {
+          const hasReacted = currentReactions?.some(
+            (r) => getParticipantId(r) === userId && r.emoji === emoji
+          );
+          return (
+            <button
+              key={emoji}
+              type="button"
+              onClick={async () => {
+                setOpen(false);
+                await reactMessage(messageId, emoji);
+              }}
+              className={`text-lg p-1 hover:scale-125 transition-transform rounded-full ${
+                hasReacted ? "bg-primary/20" : "hover:bg-muted"
+              }`}
+            >
+              {emoji}
+            </button>
+          );
+        })}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const ChatWindowLayout = () => {
   const { user } = useAuthStore();
+  const startCall = useCallStore((state) => state.startCall);
   const {
     conversations,
     selectedConversationId,
     messages,
     friends,
+    blockedUsers,
     messageSearchResults,
     messageSearchLoading,
     onlineUserIds,
@@ -272,6 +335,7 @@ const ChatWindowLayout = () => {
     sendLocation,
     editMessage,
     deleteMessage,
+    reactMessage,
     searchMessages,
     updateGroupInfo,
     addGroupMembers,
@@ -283,6 +347,7 @@ const ChatWindowLayout = () => {
   const [editingMessageId, setEditingMessageId] = React.useState<string | null>(
     null
   );
+  const [replyingToMessage, setReplyingToMessage] = React.useState<Message | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [pickerTab, setPickerTab] = React.useState<"emoji" | "sticker">(
     "emoji"
@@ -325,6 +390,7 @@ const ChatWindowLayout = () => {
     setSelectedFiles([]);
     setEditingMessageId(null);
     setSearchQuery("");
+    setReplyingToMessage(null);
   }, [selectedConversationId]);
 
   const sendTypingStart = () => {
@@ -427,8 +493,10 @@ const ChatWindowLayout = () => {
 
     const content = draft;
     const files = selectedFiles;
+    const replyToId = replyingToMessage?._id;
     setDraft("");
     setSelectedFiles([]);
+    setReplyingToMessage(null);
     stopTyping();
 
     if (editingMessageId) {
@@ -437,7 +505,7 @@ const ChatWindowLayout = () => {
       return;
     }
 
-    await sendMessage(content, files);
+    await sendMessage(content, files, replyToId);
   };
 
   const startEdit = (message: Message) => {
@@ -532,6 +600,21 @@ const ChatWindowLayout = () => {
   );
   const addableFriends = friends.filter((friend) => !participantIds.has(friend._id));
 
+  const isPeerBlocked = selectedConversation.type === "direct" &&
+    blockedUsers.some((u) => u._id === directPeerId);
+  const isDirectPeerFriend = selectedConversation.type === "direct" &&
+    friends.some((f) => f._id === directPeerId);
+  const isDisabledChat = selectedConversation.type === "direct" && (isPeerBlocked || !isDirectPeerFriend);
+
+  let textareaPlaceholder = "Nhap tin nhan...";
+  if (selectedConversation.type === "direct") {
+    if (isPeerBlocked) {
+      textareaPlaceholder = "Ban da chan nguoi dung nay";
+    } else if (!isDirectPeerFriend) {
+      textareaPlaceholder = "Hay ket ban de nhan tin";
+    }
+  }
+
   return (
     <section className="flex min-h-0 w-full flex-col overflow-hidden rounded-lg border bg-card text-card-foreground">
       <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4">
@@ -565,6 +648,30 @@ const ChatWindowLayout = () => {
             </span>
           </div>
         </div>
+        {selectedConversation.type === "direct" && !isDisabledChat && directPeer && (
+          <div className="flex items-center gap-0.5">
+            <Button
+              type="button"
+              size="icon-lg"
+              variant="ghost"
+              onClick={() => startCall(directPeer as any, "audio")}
+              title="Gọi thoại"
+              className="text-muted-foreground hover:text-primary size-9 p-0 rounded-full"
+            >
+              <PhoneIcon className="size-4.5" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-lg"
+              variant="ghost"
+              onClick={() => startCall(directPeer as any, "video")}
+              title="Gọi video"
+              className="text-muted-foreground hover:text-primary size-9 p-0 rounded-full"
+            >
+              <VideoIcon className="size-4.5" />
+            </Button>
+          </div>
+        )}
         <div className="relative w-56 max-w-[40vw]">
           <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -656,7 +763,8 @@ const ChatWindowLayout = () => {
               return (
                 <div
                   key={message._id}
-                  className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                  id={`msg-${message._id}`}
+                  className={`flex ${isMine ? "justify-end" : "justify-start"} transition-colors duration-500 rounded p-1`}
                 >
                   <div
                     className={`group flex max-w-[82%] gap-2 ${
@@ -686,28 +794,48 @@ const ChatWindowLayout = () => {
                         {message.editedAt && !isDeleted ? " · da sua" : ""}
                       </span>
                       <div className="flex items-end gap-1">
-                        {isMine && canDelete && (
-                          <div className="flex opacity-0 transition group-hover:opacity-100">
-                            {canEdit && (
-                              <Button
-                                type="button"
-                                size="icon-xs"
-                                variant="ghost"
-                                onClick={() => startEdit(message)}
-                              >
-                                <PencilIcon />
-                                <span className="sr-only">Sua tin nhan</span>
-                              </Button>
-                            )}
+                        {isMine && !isDeleted && (
+                          <div className="flex opacity-0 transition group-hover:opacity-100 items-center gap-0.5">
+                            <ReactionPicker
+                              messageId={message._id}
+                              currentReactions={message.reactions}
+                              userId={user?._id}
+                              reactMessage={reactMessage}
+                            />
                             <Button
                               type="button"
                               size="icon-xs"
                               variant="ghost"
-                              onClick={() => deleteMessage(message._id)}
+                              onClick={() => setReplyingToMessage(message)}
+                              className="shrink-0"
+                              aria-label="Tra loi"
                             >
-                              <Trash2Icon />
-                              <span className="sr-only">Thu hoi tin nhan</span>
+                              <CornerUpLeft className="size-3.5" />
                             </Button>
+                            {canDelete && (
+                              <>
+                                {canEdit && (
+                                  <Button
+                                    type="button"
+                                    size="icon-xs"
+                                    variant="ghost"
+                                    onClick={() => startEdit(message)}
+                                    aria-label="Sua tin nhan"
+                                  >
+                                    <PencilIcon />
+                                  </Button>
+                                )}
+                                <Button
+                                  type="button"
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  onClick={() => deleteMessage(message._id)}
+                                  aria-label="Thu hoi tin nhan"
+                                >
+                                  <Trash2Icon />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         )}
                         <div
@@ -721,6 +849,28 @@ const ChatWindowLayout = () => {
                                 } ${isDeleted ? "italic opacity-75" : ""}`
                           }
                         >
+                          {/* Reply box inside the bubble */}
+                          {message.replyTo && (
+                            <div
+                              onClick={() => {
+                                const target = document.getElementById(`msg-${message.replyTo?._id}`);
+                                if (target) {
+                                  target.scrollIntoView({ behavior: "smooth", block: "center" });
+                                  target.classList.add("bg-primary/20");
+                                  setTimeout(() => target.classList.remove("bg-primary/20"), 1200);
+                                }
+                              }}
+                              className={`mb-1.5 flex flex-col gap-0.5 rounded border-l-2 border-primary/50 bg-muted/40 p-1.5 text-xs text-left cursor-pointer hover:bg-muted/70 transition-colors max-w-[240px]`}
+                            >
+                              <span className="font-semibold text-primary text-[10px]">
+                                {getMessageSenderName(selectedConversation, message.replyTo, user?._id)}
+                              </span>
+                              <span className="truncate text-muted-foreground text-[10px]">
+                                {message.replyTo.deletedAt ? "Tin nhan da duoc thu hoi" : message.replyTo.content || "Tep dinh kem"}
+                              </span>
+                            </div>
+                          )}
+
                           {isDeleted ? (
                             "Tin nhan da duoc thu hoi"
                           ) : message.type === "location" && message.location ? (
@@ -738,7 +888,66 @@ const ChatWindowLayout = () => {
                             </>
                           )}
                         </div>
+
+                        {!isMine && !isDeleted && (
+                          <div className="flex opacity-0 transition group-hover:opacity-100 items-center gap-0.5">
+                            <Button
+                              type="button"
+                              size="icon-xs"
+                              variant="ghost"
+                              onClick={() => setReplyingToMessage(message)}
+                              className="shrink-0"
+                              aria-label="Tra loi"
+                            >
+                              <CornerUpLeft className="size-3.5" />
+                            </Button>
+                            <ReactionPicker
+                              messageId={message._id}
+                              currentReactions={message.reactions}
+                              userId={user?._id}
+                              reactMessage={reactMessage}
+                            />
+                          </div>
+                        )}
                       </div>
+
+                      {/* Reactions Display */}
+                      {message.reactions && message.reactions.length > 0 && (
+                        <div className={`flex flex-wrap gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                          <div
+                            onClick={async () => {
+                              const myReaction = message.reactions?.find(r => getParticipantId(r) === user?._id);
+                              if (myReaction) {
+                                await reactMessage(message._id, myReaction.emoji);
+                              } else {
+                                await reactMessage(message._id, "👍");
+                              }
+                            }}
+                            title={message.reactions.map(r => r.userId?.displayName || "Moji User").join(", ")}
+                            className="flex items-center gap-1 bg-muted border hover:bg-muted/80 rounded-full px-1.5 py-0.5 text-xs shadow-sm cursor-pointer select-none"
+                          >
+                            {(() => {
+                              const counts: Record<string, number> = {};
+                              message.reactions!.forEach(r => {
+                                counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+                              });
+                              return (
+                                <>
+                                  <span className="flex gap-0.5">
+                                    {Object.keys(counts).map(emoji => (
+                                      <span key={emoji}>{emoji}</span>
+                                    ))}
+                                  </span>
+                                  <span className="text-[10px] font-semibold text-muted-foreground">
+                                    {message.reactions!.length}
+                                  </span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
                       {message._id === lastMineMessageId && seenByOthers && (
                         <span className="px-1 text-xs text-muted-foreground">
                           Da xem
@@ -758,6 +967,28 @@ const ChatWindowLayout = () => {
         onSubmit={handleSubmit}
         className="flex shrink-0 flex-col gap-2 border-t bg-background p-3"
       >
+        {replyingToMessage && (
+          <div className="flex items-center justify-between rounded-md bg-muted/60 p-2 mb-1 border-l-2 border-primary">
+            <div className="min-w-0 flex-1 pl-1">
+              <p className="font-semibold text-primary text-xs">
+                Tra loi {getMessageSenderName(selectedConversation, replyingToMessage, user?._id)}
+              </p>
+              <p className="truncate text-xs text-muted-foreground mt-0.5">
+                {replyingToMessage.deletedAt ? "Tin nhan da duoc thu hoi" : replyingToMessage.content || "Tep dinh kem"}
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="icon-xs"
+              variant="ghost"
+              onClick={() => setReplyingToMessage(null)}
+              className="shrink-0"
+              aria-label="Huy tra loi"
+            >
+              <XIcon className="size-3.5" />
+            </Button>
+          </div>
+        )}
         {(selectedFiles.length > 0 || editingMessageId) && (
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {editingMessageId && (
@@ -792,7 +1023,7 @@ const ChatWindowLayout = () => {
                 type="button"
                 size="icon-lg"
                 variant="ghost"
-                disabled={Boolean(editingMessageId) || locating || sending}
+                disabled={Boolean(editingMessageId) || locating || sending || isDisabledChat}
                 aria-label="Mo tuy chon gui"
               >
                 {locating ? (
@@ -816,6 +1047,7 @@ const ChatWindowLayout = () => {
                 type="button"
                 size="icon-lg"
                 variant="ghost"
+                disabled={Boolean(editingMessageId) || isDisabledChat}
                 aria-label="Mo emoji va sticker"
               >
                 <SmileIcon />
@@ -888,7 +1120,7 @@ const ChatWindowLayout = () => {
             type="button"
             size="icon-lg"
             variant="ghost"
-            disabled={Boolean(editingMessageId)}
+            disabled={Boolean(editingMessageId) || isDisabledChat}
             onClick={() => fileInputRef.current?.click()}
             aria-label="Dinh kem tep"
           >
@@ -898,6 +1130,7 @@ const ChatWindowLayout = () => {
           <Textarea
             ref={textareaRef}
             value={draft}
+            disabled={isDisabledChat}
             onChange={(event) => {
               setDraft(event.target.value);
               sendTypingStart();
@@ -909,12 +1142,12 @@ const ChatWindowLayout = () => {
               }
             }}
             className="max-h-32 min-h-10 resize-none"
-            placeholder="Nhap tin nhan..."
+            placeholder={textareaPlaceholder}
           />
           <Button
             type="submit"
             size="icon-lg"
-            disabled={(!draft.trim() && selectedFiles.length === 0) || sending}
+            disabled={(!draft.trim() && selectedFiles.length === 0) || sending || isDisabledChat}
             aria-label={editingMessageId ? "Luu tin nhan" : "Gui tin nhan"}
           >
             {editingMessageId ? <CheckIcon /> : <SendIcon />}

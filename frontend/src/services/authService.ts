@@ -1,4 +1,9 @@
 import api from '@/lib/axios'
+import type { User } from '@/types/user';
+
+type ProfilePayload = Partial<
+  Pick<User, "displayName" | "email" | "bio" | "phone" | "avatarUrl">
+>;
 
 export const authService ={
   signUp: async (username: string, password: string, email: string, lastname: string, firstname: string) =>{
@@ -29,8 +34,29 @@ export const authService ={
     return res.data.user
   },
 
+  updateProfile: async (data: ProfilePayload) => {
+    const res = await api.patch<{ user: User }>("/users/me", data, {
+      withCredentials: true,
+    });
+    return res.data.user;
+  },
+
+  uploadAvatar: async (file: File) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    const res = await api.post<{ user: User }>("/users/me/avatar", formData, {
+      withCredentials: true,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return res.data.user;
+  },
+
   refresh: async () => {
-    const res = await api.post("/auth/refresh",{ withCredentials: true}  )
+    const res = await api.post("/auth/refresh", {}, {withCredentials: true})
     return res.data.accessToken;
   }
 }

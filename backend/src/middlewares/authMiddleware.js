@@ -24,6 +24,9 @@ export const protectedRoute = (req,res,next) =>{
         return res.status(404).json({message:'Người dùng không tồn tại'});
       }
     // Trả user về trong req
+      if(user.isActive === false){
+        return res.status(403).json({message:'Tai khoan da bi khoa'});
+      }
       req.user = user;
       next();
 
@@ -35,3 +38,32 @@ export const protectedRoute = (req,res,next) =>{
   
   }
 }
+
+export const requireAdmin = (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Ban khong co quyen quan tri" });
+  }
+
+  return next();
+};
+
+const ADMIN_PERMISSIONS = {
+  super_admin: ["*"],
+  moderator: ["dashboard", "users", "messages", "groups", "reports", "media"],
+  support: ["dashboard", "users"],
+};
+
+export const requireAdminPermission = (permission) => (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Ban khong co quyen quan tri" });
+  }
+
+  const adminRole = req.user.adminRole || "super_admin";
+  const permissions = ADMIN_PERMISSIONS[adminRole] || [];
+
+  if (!permissions.includes("*") && !permissions.includes(permission)) {
+    return res.status(403).json({ message: "Vai tro admin khong co quyen nay" });
+  }
+
+  return next();
+};

@@ -77,6 +77,16 @@ const conversationSchema = new mongoose.Schema({
     type: Map,
     of: Number,
     default: {},
+  },
+  status: {
+    type: String,
+    enum: ["active", "locked", "deleted"],
+    default: "active",
+    index: true,
+  },
+  lockedReason: {
+    type: String,
+    default: "",
   }
 
 },{

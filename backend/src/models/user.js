@@ -37,6 +37,29 @@ const schema = new mongoose.Schema({
   phone: {
     type: String,
     sparse:true, //cho phép null nhưng không được trùng
+  },
+  role: {
+    type: String,
+    enum: ["user", "admin"],
+    default: "user",
+    index: true,
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
+    index: true,
+  },
+  adminRole: {
+    type: String,
+    enum: ["super_admin", "moderator", "support"],
+  },
+  banReason: {
+    type: String,
+    default: "",
+  },
+  reportCount: {
+    type: Number,
+    default: 0,
   }
 },{
   timestamps:true,

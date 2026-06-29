@@ -1,0 +1,601 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--sidebar-w:220px;--header-h:56px}
+.admin-wrap{display:flex;height:100vh;min-height:700px;font-size:14px;background:var(--color-background-tertiary);color:var(--color-text-primary)}
+.sidebar{width:var(--sidebar-w);background:var(--color-background-primary);border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-logo{padding:16px 18px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:10px;font-weight:500;font-size:15px}
+.sidebar-logo .logo-icon{width:32px;height:32px;background:#534AB7;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#EEEDFE;font-size:16px}
+.nav-section{padding:10px 10px 4px;font-size:11px;color:var(--color-text-tertiary);letter-spacing:.06em;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 14px;margin:1px 8px;border-radius:var(--border-radius-md);cursor:pointer;color:var(--color-text-secondary);font-size:13.5px;transition:background .15s}
+.nav-item:hover{background:var(--color-background-secondary)}
+.nav-item.active{background:#EEEDFE;color:#3C3489;font-weight:500}
+.nav-item .badge{margin-left:auto;background:#E24B4A;color:#fff;font-size:11px;padding:1px 6px;border-radius:10px;font-weight:500}
+.sidebar-footer{margin-top:auto;padding:12px;border-top:0.5px solid var(--color-border-tertiary)}
+.admin-avatar{display:flex;align-items:center;gap:10px;padding:8px;border-radius:var(--border-radius-md)}
+.avatar-circle{width:34px;height:34px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:#3C3489;flex-shrink:0}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.header{height:var(--header-h);background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+.search-box{flex:1;max-width:360px;display:flex;align-items:center;gap:8px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:0 12px;height:34px}
+.search-box input{background:none;border:none;outline:none;font-size:13px;color:var(--color-text-primary);width:100%}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.icon-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:var(--border-radius-md);cursor:pointer;color:var(--color-text-secondary);border:0.5px solid var(--color-border-tertiary);background:none;position:relative}
+.icon-btn:hover{background:var(--color-background-secondary)}
+.notif-dot{position:absolute;top:5px;right:5px;width:7px;height:7px;background:#E24B4A;border-radius:50%;border:1.5px solid var(--color-background-primary)}
+.content{flex:1;overflow-y:auto;padding:20px}
+.page{display:none}
+.page.active{display:block}
+.page-title{font-size:18px;font-weight:500;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--color-text-secondary);margin-bottom:20px}
+.stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:14px 16px}
+.stat-label{font-size:12px;color:var(--color-text-secondary);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.stat-value{font-size:22px;font-weight:500;line-height:1}
+.stat-trend{font-size:11px;margin-top:6px}
+.trend-up{color:#3B6D11}
+.trend-down{color:#A32D2D}
+.chart-row{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:20px}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:16px}
+.card-title{font-size:14px;font-weight:500;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.tab-row{display:flex;gap:4px;background:var(--color-background-secondary);padding:3px;border-radius:var(--border-radius-md);width:fit-content;margin-bottom:16px}
+.tab{padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--color-text-secondary)}
+.tab.active{background:var(--color-background-primary);color:var(--color-text-primary);font-weight:500}
+.data-table{width:100%;border-collapse:collapse}
+.data-table th{text-align:left;font-size:12px;color:var(--color-text-secondary);font-weight:400;padding:8px 12px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.data-table td{padding:10px 12px;border-bottom:0.5px solid var(--color-border-tertiary);font-size:13px;vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:var(--color-background-secondary)}
+.user-cell{display:flex;align-items:center;gap:10px}
+.u-ava{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0}
+.badge-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+.badge-active{background:#EAF3DE;color:#27500A}
+.badge-banned{background:#FCEBEB;color:#791F1F}
+.badge-pending{background:#FAEEDA;color:#633806}
+.badge-resolved{background:#EAF3DE;color:#27500A}
+.badge-locked{background:#FAEEDA;color:#633806}
+.badge-open{background:#FCEBEB;color:#791F1F}
+.action-btns{display:flex;gap:6px}
+.act-btn{padding:4px 10px;font-size:12px;border-radius:6px;border:0.5px solid var(--color-border-secondary);background:none;cursor:pointer;color:var(--color-text-secondary)}
+.act-btn:hover{background:var(--color-background-secondary)}
+.act-btn.danger{color:#A32D2D;border-color:#F09595}
+.act-btn.danger:hover{background:#FCEBEB}
+.act-btn.primary{color:#185FA5;border-color:#85B7EB}
+.act-btn.primary:hover{background:#E6F1FB}
+.filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-select{padding:6px 10px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer}
+.search-input{padding:6px 12px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);width:200px}
+.pagination{display:flex;align-items:center;gap:6px;margin-top:14px;justify-content:flex-end}
+.pg-btn{width:28px;height:28px;border-radius:6px;border:0.5px solid var(--color-border-tertiary);background:none;cursor:pointer;font-size:12px;color:var(--color-text-secondary);display:flex;align-items:center;justify-content:center}
+.pg-btn.active{background:#EEEDFE;color:#3C3489;border-color:#AFA9EC;font-weight:500}
+.report-list{display:flex;flex-direction:column;gap:10px}
+.report-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:14px 16px}
+.report-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.report-body{font-size:13px;color:var(--color-text-secondary);margin-bottom:12px;padding:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)}
+.report-footer{display:flex;align-items:center;justify-content:space-between}
+.group-table-wrap{overflow-x:auto}
+.member-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.member-row{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md)}
+.notif-form{display:flex;flex-direction:column;gap:14px}
+.notif-form label{font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px}
+.notif-form input,.notif-form textarea,.notif-form select{width:100%;padding:8px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);font-size:13px;font-family:inherit}
+.notif-form textarea{height:80px;resize:none}
+.send-btn{padding:9px 20px;background:#534AB7;color:#EEEDFE;border:none;border-radius:var(--border-radius-md);font-size:13px;font-weight:500;cursor:pointer}
+.send-btn:hover{background:#3C3489}
+.media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.media-thumb{border-radius:var(--border-radius-md);overflow:hidden;border:0.5px solid var(--color-border-tertiary);cursor:pointer;position:relative}
+.media-thumb-img{width:100%;aspect-ratio:1;background:var(--color-background-secondary);display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--color-text-tertiary)}
+.media-thumb-info{padding:6px 8px;font-size:11px;color:var(--color-text-secondary)}
+.media-thumb .delete-overlay{position:absolute;top:4px;right:4px;width:22px;height:22px;background:#E24B4A;border-radius:50%;display:none;align-items:center;justify-content:center;color:#fff;font-size:11px;cursor:pointer}
+.media-thumb:hover .delete-overlay{display:flex}
+.perm-table{width:100%;border-collapse:collapse;font-size:12px}
+.perm-table th{padding:8px 10px;text-align:center;font-weight:500;font-size:12px;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary)}
+.perm-table th:first-child{text-align:left}
+.perm-table td{padding:8px 10px;text-align:center;border-bottom:0.5px solid var(--color-border-tertiary)}
+.perm-table td:first-child{text-align:left;font-weight:400}
+.perm-table tr:last-child td{border-bottom:none}
+.perm-check{width:16px;height:16px;accent-color:#534AB7;cursor:pointer}
+.toast{position:absolute;bottom:20px;right:20px;background:#534AB7;color:#EEEDFE;padding:10px 16px;border-radius:var(--border-radius-md);font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:99}
+.toast.show{opacity:1}
+.msg-bubble{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 12px;font-size:13px;margin-bottom:6px;border-left:3px solid #E24B4A}
+.msg-meta{font-size:11px;color:var(--color-text-tertiary);margin-top:4px}
+.storage-bar-wrap{margin-bottom:16px}
+.storage-bar-bg{height:8px;background:var(--color-background-secondary);border-radius:4px;overflow:hidden;margin-top:4px}
+.storage-bar-fill{height:100%;border-radius:4px;background:#534AB7}
+.mini-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+.mini-legend span{font-size:11px;color:var(--color-text-secondary);display:flex;align-items:center;gap:4px}
+.mini-legend b{display:inline-block;width:8px;height:8px;border-radius:2px}
+</style>
+
+<div class="admin-wrap" id="adminWrap">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="ti ti-messages"></i></div>
+      ChatAdmin
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      <div class="nav-section">Tổng quan</div>
+      <div class="nav-item active" onclick="showPage('dashboard',this)"><i class="ti ti-layout-dashboard" style="font-size:17px"></i>Dashboard</div>
+      <div class="nav-section">Quản lý</div>
+      <div class="nav-item" onclick="showPage('users',this)"><i class="ti ti-users" style="font-size:17px"></i>Người dùng</div>
+      <div class="nav-item" onclick="showPage('messages',this)"><i class="ti ti-message-report" style="font-size:17px"></i>Tin nhắn <span class="badge">5</span></div>
+      <div class="nav-item" onclick="showPage('groups',this)"><i class="ti ti-users-group" style="font-size:17px"></i>Nhóm chat</div>
+      <div class="nav-item" onclick="showPage('stories',this)"><i class="ti ti-photo" style="font-size:17px"></i>Bài đăng / Story</div>
+      <div class="nav-section">Kiểm duyệt</div>
+      <div class="nav-item" onclick="showPage('reports',this)"><i class="ti ti-flag" style="font-size:17px"></i>Báo cáo vi phạm <span class="badge">12</span></div>
+      <div class="nav-item" onclick="showPage('media',this)"><i class="ti ti-folder-open" style="font-size:17px"></i>Media / File</div>
+      <div class="nav-section">Hệ thống</div>
+      <div class="nav-item" onclick="showPage('notifications',this)"><i class="ti ti-bell" style="font-size:17px"></i>Thông báo</div>
+      <div class="nav-item" onclick="showPage('admins',this)"><i class="ti ti-shield-lock" style="font-size:17px"></i>Quyền Admin</div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="admin-avatar">
+        <div class="avatar-circle">SA</div>
+        <div>
+          <div style="font-size:13px;font-weight:500">Super Admin</div>
+          <div style="font-size:11px;color:var(--color-text-tertiary)">admin@chat.vn</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="header">
+      <div style="font-size:13px;font-weight:500;color:var(--color-text-secondary)" id="breadcrumb">Dashboard</div>
+      <div class="search-box" style="margin-left:16px">
+        <i class="ti ti-search" style="font-size:15px;color:var(--color-text-tertiary)" aria-hidden="true"></i>
+        <input type="text" placeholder="Tìm kiếm toàn hệ thống...">
+      </div>
+      <div class="header-right">
+        <button class="icon-btn" aria-label="Thông báo"><i class="ti ti-bell" style="font-size:17px"></i><span class="notif-dot"></span></button>
+        <button class="icon-btn" aria-label="Cài đặt"><i class="ti ti-settings" style="font-size:17px"></i></button>
+        <div class="avatar-circle" style="cursor:pointer">SA</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <div class="page active" id="page-dashboard">
+        <div class="page-title">Dashboard thống kê</div>
+        <div class="page-sub">Cập nhật realtime — Thứ Sáu, 19/06/2026</div>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label"><i class="ti ti-users" style="font-size:15px;color:#534AB7" aria-hidden="true"></i>Tổng người dùng</div>
+            <div class="stat-value">128.450</div>
+            <div class="stat-trend trend-up"><i class="ti ti-trending-up" aria-hidden="true"></i> +3.2% tuần này</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label"><i class="ti ti-circle-check" style="font-size:15px;color:#3B6D11" aria-hidden="true"></i>Đang online</div>
+            <div class="stat-value" id="online-count">4.821</div>
+            <div class="stat-trend trend-up"><i class="ti ti-trending-up" aria-hidden="true"></i> Cao nhất hôm nay</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label"><i class="ti ti-messages" style="font-size:15px;color:#185FA5" aria-hidden="true"></i>Tổng tin nhắn</div>
+            <div class="stat-value">3.2M</div>
+            <div class="stat-trend trend-up"><i class="ti ti-trending-up" aria-hidden="true"></i> +8.1% tháng này</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label"><i class="ti ti-users-group" style="font-size:15px;color:#854F0B" aria-hidden="true"></i>Tổng nhóm chat</div>
+            <div class="stat-value">18.340</div>
+            <div class="stat-trend trend-up"><i class="ti ti-trending-up" aria-hidden="true"></i> +1.4% tuần này</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label"><i class="ti ti-flag" style="font-size:15px;color:#A32D2D" aria-hidden="true"></i>Báo cáo chờ</div>
+            <div class="stat-value" style="color:#E24B4A">12</div>
+            <div class="stat-trend trend-down"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Cần xử lý gấp</div>
+          </div>
+        </div>
+        <div class="chart-row">
+          <div class="card">
+            <div class="card-title">Người dùng hoạt động
+              <div class="tab-row">
+                <div class="tab active" onclick="switchTab(this,'d7')">7 ngày</div>
+                <div class="tab" onclick="switchTab(this,'d30')">30 ngày</div>
+              </div>
+            </div>
+            <div style="position:relative;height:180px"><canvas id="lineChart" role="img" aria-label="Biểu đồ người dùng hoạt động 7 ngày gần nhất">Dữ liệu người dùng hoạt động theo ngày.</canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Phân loại vi phạm</div>
+            <div style="position:relative;height:150px"><canvas id="doughnutChart" role="img" aria-label="Biểu đồ phân loại báo cáo vi phạm">Spam 40%, Nội dung xấu 30%, Quấy rối 20%, Khác 10%.</canvas></div>
+            <div class="mini-legend" style="margin-top:10px">
+              <span><b style="background:#534AB7"></b>Spam 40%</span>
+              <span><b style="background:#E24B4A"></b>Nội dung 30%</span>
+              <span><b style="background:#EF9F27"></b>Quấy rối 20%</span>
+              <span><b style="background:#888780"></b>Khác 10%</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Tin nhắn theo giờ trong ngày</div>
+          <div style="position:relative;height:140px"><canvas id="barChart" role="img" aria-label="Biểu đồ cột số tin nhắn theo từng giờ trong ngày">Cao điểm 8h, 12h, 20h-22h.</canvas></div>
+        </div>
+      </div>
+
+      <div class="page" id="page-users">
+        <div class="page-title">Quản lý người dùng</div>
+        <div class="page-sub">Toàn bộ tài khoản trong hệ thống</div>
+        <div class="filters">
+          <input class="search-input" type="text" placeholder="Tìm tên, email, ID...">
+          <select class="filter-select">
+            <option>Tất cả trạng thái</option>
+            <option>Đang hoạt động</option>
+            <option>Đã bị khóa</option>
+          </select>
+          <select class="filter-select">
+            <option>Sắp xếp: Mới nhất</option>
+            <option>Nhiều tin nhắn nhất</option>
+            <option>Bị report nhiều nhất</option>
+          </select>
+          <button class="act-btn" style="margin-left:auto"><i class="ti ti-download"></i> Xuất CSV</button>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table class="data-table">
+            <thead><tr>
+              <th><input type="checkbox"></th>
+              <th>Người dùng</th><th>Email</th><th>Trạng thái</th>
+              <th>Tin nhắn</th><th>Báo cáo</th><th>Ngày tạo</th><th>Hành động</th>
+            </tr></thead>
+            <tbody id="userTableBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="userPagination"></div>
+      </div>
+
+      <div class="page" id="page-messages">
+        <div class="page-title">Quản lý tin nhắn</div>
+        <div class="page-sub">Tin nhắn bị báo cáo và kiểm duyệt spam</div>
+        <div class="filters">
+          <select class="filter-select"><option>Tất cả loại</option><option>Spam</option><option>Nội dung xấu</option><option>File độc hại</option></select>
+          <select class="filter-select"><option>Chờ xử lý</option><option>Đã xử lý</option></select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px" id="msgList"></div>
+      </div>
+
+      <div class="page" id="page-groups">
+        <div class="page-title">Quản lý nhóm chat</div>
+        <div class="page-sub">Danh sách tất cả nhóm trong hệ thống</div>
+        <div class="filters">
+          <input class="search-input" type="text" placeholder="Tìm tên nhóm...">
+          <select class="filter-select"><option>Tất cả</option><option>Đang hoạt động</option><option>Đã khóa</option></select>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table class="data-table" id="groupTable">
+            <thead><tr><th>Nhóm</th><th>Trưởng nhóm</th><th>Thành viên</th><th>Tin nhắn</th><th>Trạng thái</th><th>Ngày tạo</th><th>Hành động</th></tr></thead>
+            <tbody id="groupBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="page" id="page-stories">
+        <div class="page-title">Quản lý bài đăng / Story</div>
+        <div class="page-sub">Story bị báo cáo chờ kiểm duyệt</div>
+        <div class="filters">
+          <select class="filter-select"><option>Tất cả loại</option><option>Ảnh</option><option>Video</option></select>
+          <select class="filter-select"><option>Chờ duyệt</option><option>Đã ẩn</option><option>Đã xóa</option></select>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px" id="storyGrid"></div>
+      </div>
+
+      <div class="page" id="page-reports">
+        <div class="page-title">Báo cáo vi phạm</div>
+        <div class="page-sub">Hàng đợi report chờ xử lý</div>
+        <div class="filters">
+          <select class="filter-select" onchange="filterReports(this.value)"><option value="all">Tất cả loại</option><option value="user">Report user</option><option value="msg">Report tin nhắn</option><option value="story">Report story</option><option value="group">Report nhóm</option></select>
+          <select class="filter-select"><option>Mức độ: Tất cả</option><option>Nghiêm trọng</option><option>Bình thường</option></select>
+          <span style="margin-left:auto;font-size:12px;color:var(--color-text-secondary)" id="reportCount">12 báo cáo chờ xử lý</span>
+        </div>
+        <div class="report-list" id="reportList"></div>
+      </div>
+
+      <div class="page" id="page-media">
+        <div class="page-title">Quản lý media / File</div>
+        <div class="page-sub">Thư viện ảnh, video và tài liệu hệ thống</div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title">Dung lượng lưu trữ</div>
+          <div class="storage-bar-wrap">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--color-text-secondary)"><span>Đã dùng: 68.4 GB / 100 GB</span><span>68%</span></div>
+            <div class="storage-bar-bg"><div class="storage-bar-fill" style="width:68%"></div></div>
+          </div>
+          <div class="mini-legend">
+            <span><b style="background:#534AB7"></b>Ảnh — 28.1 GB</span>
+            <span><b style="background:#185FA5"></b>Video — 32.6 GB</span>
+            <span><b style="background:#3B6D11"></b>Tài liệu — 7.7 GB</span>
+          </div>
+        </div>
+        <div class="filters">
+          <div class="tab-row">
+            <div class="tab active" onclick="switchTab(this,'img')">Ảnh</div>
+            <div class="tab" onclick="switchTab(this,'vid')">Video</div>
+            <div class="tab" onclick="switchTab(this,'doc')">Tài liệu</div>
+          </div>
+          <select class="filter-select" style="margin-left:auto"><option>Mới nhất</option><option>Lớn nhất</option><option>Bị báo cáo</option></select>
+        </div>
+        <div class="media-grid" id="mediaGrid"></div>
+      </div>
+
+      <div class="page" id="page-notifications">
+        <div class="page-title">Quản lý thông báo</div>
+        <div class="page-sub">Gửi thông báo hệ thống đến người dùng</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="card">
+            <div class="card-title">Soạn thông báo mới</div>
+            <div class="notif-form">
+              <div>
+                <label>Loại thông báo</label>
+                <select><option>Thông báo hệ thống</option><option>Thông báo bảo trì</option><option>Chính sách mới</option></select>
+              </div>
+              <div>
+                <label>Đối tượng nhận</label>
+                <select><option>Tất cả người dùng</option><option>Người dùng active</option><option>Admin</option></select>
+              </div>
+              <div>
+                <label>Tiêu đề</label>
+                <input type="text" placeholder="Nhập tiêu đề thông báo...">
+              </div>
+              <div>
+                <label>Nội dung</label>
+                <textarea placeholder="Nhập nội dung thông báo..."></textarea>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="send-btn" onclick="showToast('Đã gửi thông báo thành công!')"><i class="ti ti-send"></i> Gửi ngay</button>
+                <button class="act-btn"><i class="ti ti-calendar"></i> Lên lịch</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Lịch sử thông báo</div>
+            <div style="display:flex;flex-direction:column;gap:8px" id="notifHistory"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="page-admins">
+        <div class="page-title">Quản lý quyền Admin</div>
+        <div class="page-sub">Tài khoản quản trị viên và phân quyền</div>
+        <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:16px">
+          <div class="card">
+            <div class="card-title">Danh sách quản trị viên
+              <button class="act-btn primary" onclick="showToast('Mở form thêm admin mới')"><i class="ti ti-plus"></i> Thêm</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px" id="adminList"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Ma trận phân quyền</div>
+            <div style="overflow-x:auto">
+              <table class="perm-table" id="permTable"></table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const users=[
+  {id:1,name:'Nguyễn Văn An',email:'an.nv@gmail.com',status:'active',msgs:1240,reports:0,created:'12/01/2025',color:'#534AB7',initials:'NA'},
+  {id:2,name:'Trần Thị Bình',email:'binh.tt@gmail.com',status:'active',msgs:890,reports:1,created:'18/02/2025',color:'#185FA5',initials:'TB'},
+  {id:3,name:'Lê Minh Cường',email:'cuong.lm@gmail.com',status:'banned',msgs:320,reports:5,created:'03/03/2025',color:'#E24B4A',initials:'LC'},
+  {id:4,name:'Phạm Thu Dung',email:'dung.pt@yahoo.com',status:'active',msgs:2100,reports:0,created:'22/03/2025',color:'#3B6D11',initials:'TD'},
+  {id:5,name:'Hoàng Văn Em',email:'em.hv@gmail.com',status:'active',msgs:560,reports:2,created:'05/04/2025',color:'#854F0B',initials:'HE'},
+  {id:6,name:'Võ Thị Phương',email:'phuong.vt@gmail.com',status:'banned',msgs:45,reports:8,created:'10/05/2025',color:'#993556',initials:'VP'},
+  {id:7,name:'Đặng Quốc Hùng',email:'hung.dq@gmail.com',status:'active',msgs:3400,reports:0,created:'14/05/2025',color:'#0F6E56',initials:'DH'},
+  {id:8,name:'Bùi Ngọc Lan',email:'lan.bn@gmail.com',status:'active',msgs:780,reports:1,created:'20/05/2025',color:'#534AB7',initials:'BL'},
+];
+const PAGE_SIZE=5;let curPage=1;
+function renderUsers(){
+  const rows=users.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
+  const tbody=document.getElementById('userTableBody');
+  tbody.innerHTML=rows.map(u=>`<tr>
+    <td><input type="checkbox"></td>
+    <td><div class="user-cell"><div class="u-ava" style="background:${u.color}22;color:${u.color}">${u.initials}</div><div><div style="font-weight:500;font-size:13px">${u.name}</div><div style="font-size:11px;color:var(--color-text-tertiary)">ID #${u.id}</div></div></div></td>
+    <td style="color:var(--color-text-secondary)">${u.email}</td>
+    <td><span class="badge-pill ${u.status==='active'?'badge-active':'badge-banned'}">${u.status==='active'?'Hoạt động':'Đã khóa'}</span></td>
+    <td>${u.msgs.toLocaleString()}</td>
+    <td>${u.reports>0?`<span style="color:#A32D2D;font-weight:500">${u.reports}</span>`:u.reports}</td>
+    <td style="color:var(--color-text-secondary)">${u.created}</td>
+    <td><div class="action-btns">
+      <button class="act-btn primary" onclick="showToast('Xem hồ sơ: ${u.name}')"><i class="ti ti-eye"></i></button>
+      <button class="act-btn ${u.status==='active'?'danger':''}" onclick="toggleUser(${u.id})">${u.status==='active'?'<i class="ti ti-lock"></i>':'<i class="ti ti-lock-open"></i>'}</button>
+    </div></td>
+  </tr>`).join('');
+  const pg=document.getElementById('userPagination');
+  const total=Math.ceil(users.length/PAGE_SIZE);
+  pg.innerHTML='<span style="font-size:12px;color:var(--color-text-secondary);margin-right:6px">'+users.length+' người dùng</span>'+
+    [...Array(total)].map((_,i)=>`<button class="pg-btn ${curPage===i+1?'active':''}" onclick="goPage(${i+1})">${i+1}</button>`).join('');
+}
+function goPage(p){curPage=p;renderUsers()}
+function toggleUser(id){const u=users.find(x=>x.id===id);u.status=u.status==='active'?'banned':'active';renderUsers();showToast(u.status==='banned'?`Đã khóa tài khoản ${u.name}`:`Đã mở khóa ${u.name}`)}
+renderUsers();
+
+const msgs=[
+  {from:'Lê Minh Cường',to:'Nhóm Mua Bán Chung',content:'Bán tài khoản game giá rẻ, ib mình nha mọi người....',type:'Spam',time:'19/06/2025 08:42'},
+  {from:'Võ Thị Phương',to:'Nguyễn Văn An',content:'Mày im đi không tao report mày bây giờ!!!',type:'Quấy rối',time:'19/06/2025 10:15'},
+  {from:'Unknown_User99',to:'Nhóm Công Nghệ VN',content:'[File: virus_tool.exe] — 2.4MB',type:'File độc hại',time:'19/06/2025 11:30'},
+  {from:'SpamBot_001',to:'Broadcast',content:'Nhận ngay 500k khi đăng ký tại link: abc-scam.com...',type:'Spam',time:'18/06/2025 22:00'},
+  {from:'Troll_Acc',to:'Nhóm Học Tập',content:'[Nội dung vi phạm đã bị ẩn]',type:'Nội dung xấu',time:'18/06/2025 20:11'},
+];
+document.getElementById('msgList').innerHTML=msgs.map(m=>`<div class="card" style="padding:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:13px;font-weight:500">${m.from}</span>
+      <i class="ti ti-arrow-right" style="font-size:12px;color:var(--color-text-tertiary)"></i>
+      <span style="font-size:13px;color:var(--color-text-secondary)">${m.to}</span>
+    </div>
+    <span class="badge-pill ${m.type==='Spam'?'badge-open':m.type==='File độc hại'?'badge-open':'badge-pending'}">${m.type}</span>
+  </div>
+  <div class="msg-bubble">${m.content}<div class="msg-meta">${m.time}</div></div>
+  <div class="action-btns">
+    <button class="act-btn danger" onclick="showToast('Đã xóa tin nhắn vi phạm')"><i class="ti ti-trash"></i> Xóa tin</button>
+    <button class="act-btn" onclick="showToast('Đã cảnh báo người gửi')"><i class="ti ti-alert-triangle"></i> Cảnh báo</button>
+    <button class="act-btn danger" onclick="showToast('Đã khóa tài khoản')"><i class="ti ti-lock"></i> Khóa tài khoản</button>
+  </div>
+</div>`).join('');
+
+const groups=[
+  {name:'Cộng Đồng Dev VN',leader:'Đặng Q. Hùng',members:1240,msgs:45200,status:'active',created:'10/01/2025'},
+  {name:'Mua Bán Online HCM',leader:'Nguyễn V. An',members:890,msgs:12300,status:'active',created:'20/02/2025'},
+  {name:'Nhóm Cờ Bạc Online',leader:'Lê M. Cường',members:45,msgs:3200,status:'locked',created:'01/05/2025'},
+  {name:'Học Tiếng Anh Cùng Nhau',leader:'Phạm T. Dung',members:560,msgs:8900,status:'active',created:'15/03/2025'},
+  {name:'Spam Quảng Cáo Bot',leader:'Unknown',members:12,msgs:98000,status:'locked',created:'10/06/2025'},
+];
+document.getElementById('groupBody').innerHTML=groups.map(g=>`<tr>
+  <td><div class="user-cell"><div class="u-ava" style="background:#EEEDFE;color:#3C3489;font-size:11px">${g.name.slice(0,2)}</div><span style="font-weight:500">${g.name}</span></div></td>
+  <td style="color:var(--color-text-secondary)">${g.leader}</td>
+  <td>${g.members.toLocaleString()}</td>
+  <td>${g.msgs.toLocaleString()}</td>
+  <td><span class="badge-pill ${g.status==='active'?'badge-active':'badge-banned'}">${g.status==='active'?'Hoạt động':'Đã khóa'}</span></td>
+  <td style="color:var(--color-text-secondary)">${g.created}</td>
+  <td><div class="action-btns">
+    <button class="act-btn primary" onclick="showToast('Xem thành viên: '+this.closest('tr').querySelector('span.font-weight-500, [style*=font-weight]')?.textContent||'nhóm')"><i class="ti ti-users"></i></button>
+    <button class="act-btn ${g.status==='active'?'danger':''}" onclick="showToast('Đã ${g.status==='active'?'khóa':'mở khóa'} nhóm')">${g.status==='active'?'<i class="ti ti-lock"></i>':'<i class="ti ti-lock-open"></i>'}</button>
+    <button class="act-btn danger" onclick="showToast('Đã xóa nhóm')"><i class="ti ti-trash"></i></button>
+  </div></td>
+</tr>`).join('');
+
+const stories=[
+  {author:'Lê M. Cường',type:'Ảnh',reports:3,reason:'Hình ảnh phản cảm',time:'19/06 09:10',icon:'ti-photo'},
+  {author:'Võ T. Phương',type:'Video',reports:7,reason:'Nội dung bạo lực',time:'19/06 10:22',icon:'ti-video'},
+  {author:'SpamBot_001',type:'Ảnh',reports:12,reason:'Quảng cáo trái phép',time:'18/06 22:15',icon:'ti-photo'},
+  {author:'Troll_Acc',type:'Ảnh',reports:2,reason:'Sai sự thật',time:'18/06 18:40',icon:'ti-photo'},
+];
+document.getElementById('storyGrid').innerHTML=stories.map(s=>`<div class="card" style="padding:0;overflow:hidden">
+  <div style="background:var(--color-background-secondary);height:130px;display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--color-text-tertiary)"><i class="ti ${s.icon}" aria-hidden="true"></i></div>
+  <div style="padding:10px 12px">
+    <div style="font-weight:500;font-size:13px;margin-bottom:2px">${s.author}</div>
+    <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">${s.time} · ${s.type}</div>
+    <div style="font-size:11px;color:#A32D2D;background:#FCEBEB;padding:3px 8px;border-radius:6px;margin-bottom:8px">${s.reports} report · ${s.reason}</div>
+    <div class="action-btns">
+      <button class="act-btn danger" onclick="showToast('Đã ẩn story')"><i class="ti ti-eye-off"></i> Ẩn</button>
+      <button class="act-btn danger" onclick="showToast('Đã xóa story')"><i class="ti ti-trash"></i></button>
+    </div>
+  </div>
+</div>`).join('');
+
+const reports=[
+  {type:'user',label:'Report user',target:'Võ Thị Phương',reporter:'Nguyễn Văn An',reason:'Quấy rối, đe dọa nhiều lần',level:'Nghiêm trọng',time:'19/06 10:15'},
+  {type:'msg',label:'Report tin nhắn',target:'Tin nhắn #TN_8821',reporter:'Trần Thị Bình',reason:'Spam quảng cáo liên tục',level:'Bình thường',time:'19/06 09:42'},
+  {type:'story',label:'Report story',target:'Story của SpamBot_001',reporter:'Phạm Thu Dung',reason:'Quảng cáo trái phép',level:'Nghiêm trọng',time:'18/06 22:15'},
+  {type:'group',label:'Report nhóm',target:'Nhóm Cờ Bạc Online',reporter:'Hoàng Văn Em',reason:'Nội dung cờ bạc, vi phạm pháp luật',level:'Nghiêm trọng',time:'18/06 20:00'},
+  {type:'user',label:'Report user',target:'Lê Minh Cường',reporter:'Bùi Ngọc Lan',reason:'Bán hàng giả mạo trong nhóm',level:'Bình thường',time:'18/06 15:30'},
+];
+let filteredReports=[...reports];
+function filterReports(val){
+  filteredReports=val==='all'?[...reports]:reports.filter(r=>r.type===val);
+  document.getElementById('reportCount').textContent=filteredReports.length+' báo cáo';
+  renderReports();
+}
+function renderReports(){
+  document.getElementById('reportList').innerHTML=filteredReports.map((r,i)=>`<div class="report-card">
+    <div class="report-header">
+      <span class="badge-pill badge-open">${r.label}</span>
+      <span style="font-size:13px;font-weight:500">${r.target}</span>
+      <span class="badge-pill ${r.level==='Nghiêm trọng'?'badge-open':'badge-pending'}" style="margin-left:auto">${r.level}</span>
+    </div>
+    <div class="report-body">
+      <div style="margin-bottom:4px"><span style="color:var(--color-text-tertiary)">Lý do: </span>${r.reason}</div>
+      <div style="font-size:11px;color:var(--color-text-tertiary)">Báo cáo bởi ${r.reporter} · ${r.time}</div>
+    </div>
+    <div class="report-footer">
+      <div class="action-btns">
+        <button class="act-btn danger" onclick="resolveReport(${i},'Đã xử lý vi phạm và khóa tài khoản')"><i class="ti ti-check"></i> Duyệt & Xử lý</button>
+        <button class="act-btn" onclick="resolveReport(${i},'Đã từ chối report')"><i class="ti ti-x"></i> Từ chối</button>
+      </div>
+      <span style="font-size:11px;color:var(--color-text-tertiary)">#RPT_${(i+1001)}</span>
+    </div>
+  </div>`).join('');
+}
+function resolveReport(i,msg){filteredReports.splice(i,1);renderReports();document.getElementById('reportCount').textContent=filteredReports.length+' báo cáo';showToast(msg)}
+renderReports();
+
+const mediaItems=[
+  {icon:'ti-photo',name:'img_001.jpg',size:'2.4MB',flagged:false},
+  {icon:'ti-photo',name:'img_002.png',size:'1.8MB',flagged:true},
+  {icon:'ti-video',name:'vid_001.mp4',size:'18MB',flagged:false},
+  {icon:'ti-photo',name:'img_003.jpg',size:'3.1MB',flagged:false},
+  {icon:'ti-video',name:'vid_002.mp4',size:'42MB',flagged:true},
+  {icon:'ti-photo',name:'img_004.gif',size:'0.9MB',flagged:false},
+  {icon:'ti-file',name:'doc_001.pdf',size:'0.4MB',flagged:false},
+  {icon:'ti-photo',name:'img_005.jpg',size:'1.2MB',flagged:false},
+];
+document.getElementById('mediaGrid').innerHTML=mediaItems.map(m=>`<div class="media-thumb">
+  <div class="media-thumb-img"><i class="ti ${m.icon}" aria-hidden="true"></i></div>
+  ${m.flagged?'<div style="position:absolute;top:4px;left:4px;background:#E24B4A;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:500">VI PHẠM</div>':''}
+  <span class="delete-overlay" onclick="showToast('Đã xóa file')"><i class="ti ti-trash" aria-hidden="true"></i></span>
+  <div class="media-thumb-info">${m.name}<br><span style="color:var(--color-text-tertiary)">${m.size}</span></div>
+</div>`).join('');
+
+const notifH=[
+  {title:'Bảo trì hệ thống 23:00',type:'Bảo trì',sent:'18/06 20:00',read:'94%'},
+  {title:'Cập nhật chính sách privacy',type:'Chính sách',sent:'15/06 09:00',read:'87%'},
+  {title:'Tính năng mới: Story reaction',type:'Hệ thống',sent:'10/06 12:00',read:'91%'},
+];
+document.getElementById('notifHistory').innerHTML=notifH.map(n=>`<div style="padding:10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+    <span style="font-size:13px;font-weight:500">${n.title}</span>
+    <span class="badge-pill badge-active">${n.read} đã đọc</span>
+  </div>
+  <div style="font-size:11px;color:var(--color-text-secondary)">${n.type} · ${n.sent}</div>
+</div>`).join('');
+
+const adminMembers=[
+  {name:'Super Admin',email:'admin@chat.vn',role:'Super Admin',status:'active',last:'Hôm nay 09:10',initials:'SA',color:'#534AB7'},
+  {name:'Nguyễn Mod',email:'mod1@chat.vn',role:'Moderator',status:'active',last:'Hôm nay 08:45',initials:'NM',color:'#185FA5'},
+  {name:'Trần Support',email:'sup1@chat.vn',role:'Support',status:'active',last:'Hôm qua 17:30',initials:'TS',color:'#3B6D11'},
+  {name:'Lê Cũ',email:'old@chat.vn',role:'Moderator',status:'locked',last:'01/05/2025',initials:'LC',color:'#888780'},
+];
+document.getElementById('adminList').innerHTML=adminMembers.map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md)">
+  <div class="avatar-circle" style="background:${a.color}22;color:${a.color}">${a.initials}</div>
+  <div style="flex:1;min-width:0">
+    <div style="font-size:13px;font-weight:500">${a.name}</div>
+    <div style="font-size:11px;color:var(--color-text-tertiary)">${a.role} · ${a.last}</div>
+  </div>
+  <span class="badge-pill ${a.status==='active'?'badge-active':'badge-banned'}">${a.status==='active'?'Active':'Khóa'}</span>
+</div>`).join('');
+
+const perms=['Dashboard','Người dùng','Tin nhắn','Nhóm','Báo cáo','Thông báo','Media','Admin'];
+const roles=['Super','Mod','Support'];
+const permData={Super:[1,1,1,1,1,1,1,1],Mod:[1,1,1,1,1,1,1,0],Support:[1,1,0,0,1,0,0,0]};
+const pt=document.getElementById('permTable');
+pt.innerHTML=`<thead><tr><th>Quyền</th>${roles.map(r=>`<th>${r}</th>`).join('')}</tr></thead><tbody>${perms.map((p,i)=>`<tr><td>${p}</td>${roles.map(r=>`<td><input type="checkbox" class="perm-check" ${permData[r][i]?'checked':''} onchange="showToast('Đã cập nhật quyền')"></td>`).join('')}</tr>`).join('')}</tbody>`;
+
+function showPage(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  el.classList.add('active');
+  const names={dashboard:'Dashboard',users:'Người dùng',messages:'Tin nhắn',groups:'Nhóm chat',stories:'Bài đăng',reports:'Báo cáo vi phạm',media:'Media',notifications:'Thông báo',admins:'Quyền Admin'};
+  document.getElementById('breadcrumb').textContent=names[id]||id;
+}
+function switchTab(el,val){el.parentElement.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active')}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+
+const dark=matchMedia('(prefers-color-scheme:dark)').matches;
+const gridColor=dark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.05)';
+const textColor=dark?'#888780':'#888780';
+new Chart(document.getElementById('lineChart'),{
+  type:'line',
+  data:{labels:['T2','T3','T4','T5','T6','T7','CN'],
+    datasets:[{label:'Người dùng',data:[3200,3800,3100,4200,4800,3900,4821],borderColor:'#534AB7',backgroundColor:'#534AB720',fill:true,tension:0.4,pointRadius:3,borderWidth:2,pointBorderColor:'#534AB7',pointBorderWidth:0,borderDash:[]}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor},ticks:{color:textColor,font:{size:11}}},y:{grid:{color:gridColor},ticks:{color:textColor,font:{size:11}}}}}
+});
+new Chart(document.getElementById('doughnutChart'),{
+  type:'doughnut',
+  data:{labels:['Spam','Nội dung','Quấy rối','Khác'],datasets:[{data:[40,30,20,10],backgroundColor:['#534AB7','#E24B4A','#EF9F27','#888780'],borderWidth:0}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'68%'}
+});
+const hrs=['0h','2h','4h','6h','8h','10h','12h','14h','16h','18h','20h','22h'];
+new Chart(document.getElementById('barChart'),{
+  type:'bar',
+  data:{labels:hrs,datasets:[{label:'Tin nhắn',data:[120,60,40,80,420,380,610,340,290,380,820,740],backgroundColor:'#534AB740',borderColor:'#534AB7',borderWidth:1}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor},ticks:{color:textColor,font:{size:10}}},y:{grid:{color:gridColor},ticks:{color:textColor,font:{size:10}}}}}
+});
+
+setInterval(()=>{
+  const v=4800+Math.floor(Math.random()*80);
+  document.getElementById('online-count').textContent=v.toLocaleString('vi-VN');
+},3000);
+</script>

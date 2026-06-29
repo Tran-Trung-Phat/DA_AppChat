@@ -1,16 +1,18 @@
 export const updateConversationAfterCreateMessage = (conversation, message, senderId) =>{
   const createdAt = message.createdAt || new Date();
+  const hasAttachments = Boolean(message.attachments?.length);
+  const content = message.content || (hasAttachments ? "Da gui tep dinh kem" : "");
 
   if(!conversation.unreadCounts){
     conversation.unreadCounts = new Map();
   }
 
   conversation.set({
-    seenBy: [],
+    seenBy: [senderId],
     lastMessageAt: createdAt,
     lastMessage: {
       _id: message._id,
-      content: message.content,
+      content,
       senderId,
       createdAt,
     }

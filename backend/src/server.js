@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -8,22 +9,29 @@ import userRouter from './routes/userRouter.js';
 import friendRoute from './routes/friendRoute.js';
 import messageRoute from './routes/messageRoute.js';
 import conversationRoute from './routes/conversationRoute.js';
+import adminRoute from './routes/adminRoute.js';
 import cookieParser from 'cookie-parser';
 import { protectedRoute } from './middlewares/authMiddleware.js';
 import cors from 'cors';
+import { initSocket } from './libs/socket.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-console.log("ENV TEST:", process.env.MONGODB_CONNECTIONSTRING);
-console.log(process.env.MONGODB_CONNECTIONSTRING);
-
 const app = express();
+const server = http.createServer(app);
 const PORT =process.env.PORT || 5001;
+const CLIENT_URL = process.env.CLIENT_URL || [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+];
+initSocket(server);
 
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({origin: process.env.CLIENT_URL, credentials: true}))
+app.use(cors({origin: CLIENT_URL, credentials: true}))
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // public routes
 app.use('/api/auth',authRouter);
 // private routes
@@ -32,10 +40,11 @@ app.use('/api/users', userRouter);
 app.use('/api/friends',friendRoute);
 app.use('/api/messages',messageRoute);
 app.use('/api/conversations', conversationRoute);
+app.use('/api/admin', adminRoute);
 
 
 connectDB().then(() =>{
-  app.listen(PORT,()=>{
+  server.listen(PORT,()=>{
   console.log(`Server bắt đầu trên cổng ${PORT}`);
 })
 });

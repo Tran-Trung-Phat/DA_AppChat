@@ -1,15 +1,22 @@
 import express from 'express';
 
 import {
+  editMessage,
+  revokeMessage,
+  searchMessages,
   sendDirectMessage,
   sendGroupMessage
 
 } from '../controllers/messageController.js';
 import { checkFriendship, checkGroupMembership } from '../middlewares/friendMiddleware.js';
+import { uploadMessageAttachments } from '../middlewares/uploadMiddleware.js';
 
 const router = express.Router();
 
-router.post('/direct',checkFriendship, sendDirectMessage);
-router.post('/group', checkGroupMembership, sendGroupMessage);
+router.get('/search', searchMessages);
+router.post('/direct', uploadMessageAttachments, checkFriendship, sendDirectMessage);
+router.post('/group', uploadMessageAttachments, checkGroupMembership, sendGroupMessage);
+router.patch('/:messageId', editMessage);
+router.delete('/:messageId', revokeMessage);
 
 export default router;

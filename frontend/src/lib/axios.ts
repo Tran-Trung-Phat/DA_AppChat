@@ -1,57 +1,60 @@
-import { useAuthStore } from '@/stores/useAuthStore';
-import axios from 'axios';
+import axios from "axios";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 const api = axios.create({
-  baseURL: import.meta.env.MODE === 'development' ? 'http://localhost:5001/api' : '/api',
+  baseURL:
+    import.meta.env.MODE === "development"
+      ? "http://localhost:5001/api"
+      : "/api",
   withCredentials: true,
-})
+});
 
-//Gắn access Token vào req header
-api.interceptors.request.use((config)=>{
-  const {accessToken} = useAuthStore.getState();
+api.interceptors.request.use((config) => {
+  const { accessToken } = useAuthStore.getState();
 
-  if(accessToken){
+  if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
-  
   }
+
   return config;
 });
 
-//Tự động gọi refresh api khi access token hết hạn
-api.interceptors.response.use((res)=> res, async (error) =>{
-  const originaRequest = error.config;
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const originalRequest = error.config;
+    const requestUrl = originalRequest?.url ?? "";
 
-  //Những api không cần check
-  if(
-    originaRequest.url.includes("/auth/signin") ||
-    originaRequest.url.includes("/auth/signup") ||
-    originaRequest.url.includes("/auth/refresh") 
-  ) {
-      originaRequest._retryCount= originaRequest._retryCount || 0;
+    if (
+      requestUrl.includes("/auth/signin") ||
+      requestUrl.includes("/auth/signup") ||
+      requestUrl.includes("/auth/refresh") ||
+      !originalRequest
+    ) {
       return Promise.reject(error);
-     }
-     if(error.response?.status === 403 && originaRequest._retryCount < 4){
-      originaRequest._retryCount += 1;
-      console.log('refresh',originaRequest._retryCount);
-      try{
-        const res = await api.post("/auth/refresh",{withCredentials: true});
+    }
+
+    originalRequest._retryCount = originalRequest._retryCount ?? 0;
+
+    if (error.response?.status === 403 && originalRequest._retryCount < 4) {
+      originalRequest._retryCount += 1;
+
+      try {
+        const res = await api.post("/auth/refresh", {}, { withCredentials: true });
         const newAccessToken = res.data.accessToken;
 
-        useAuthStore.getState().setAccessToken(newAccessToken)
+        useAuthStore.getState().setAccessToken(newAccessToken);
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
-        originaRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-
-        return api(originaRequest);
-        
-      }catch(refreshError){
+        return api(originalRequest);
+      } catch (refreshError) {
         useAuthStore.getState().clearState();
         return Promise.reject(refreshError);
       }
-     }
+    }
 
-     return Promise.reject(error);
-  
-})
-
+    return Promise.reject(error);
+  }
+);
 
 export default api;

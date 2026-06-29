@@ -250,6 +250,41 @@
 
 /* Chat App Utility Classes */
 @layer components {
+  .admin-panel {
+    font-size: 14px;
+    --radius: 0.625rem;
+    --primary: 245 43% 50%;
+    --ring: 245 43% 50%;
+  }
+
+  .admin-panel [data-slot="sidebar-inset"] {
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .admin-panel [data-slot="card"] {
+    gap: 0.75rem;
+    border-radius: 0.625rem;
+    padding-block: 0.875rem;
+    box-shadow: none;
+    ring-color: hsl(var(--border));
+  }
+
+  .admin-panel [data-slot="card-header"],
+  .admin-panel [data-slot="card-content"] {
+    padding-inline: 1rem;
+  }
+
+  .admin-panel [data-slot="card-title"] {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .admin-panel [data-slot="card-description"] {
+    font-size: 0.75rem;
+  }
+
   .glass {
     @apply bg-gradient-to-br from-violet-200/10 to-pink-100/5 border-violet-300/30;
   }

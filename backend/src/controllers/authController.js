@@ -3,6 +3,13 @@ import User from '../models/user.js';
 import Session from '../models/Session.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import LoginLog from '../models/LoginLog.js';
+const isProduction = process.env.NODE_ENV === 'production';
+const refreshCookieOptions = {
+  httpOnly:true,
+  secure:isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
+};
 const ACCESS_TOKEN_TTL='15m'; //thường là dưới 15m
 const REFRESH_TOKEN_TTL=14*24*60*60*1000; //14 ngày tính bằng ms
 
@@ -30,7 +37,7 @@ export const signUp = async (req, res) =>{
       displayName:`${lastName} ${firstName}`
     })
     //return 
-    return res.sendStatus(204)
+    return res.status(201).json({message:"Tao tai khoan thanh cong"})
   }catch(error){
     console.error("Lỗi khi gọi signUp",error);
     return res.status(500).json({message:"Lỗi hệ thống"})
@@ -50,12 +57,39 @@ export const signIn = async (req, res) =>{
     //lấy hashedpassword trong db so sánh với input
     const user= await User.findOne({username});
     if(!user){
+      await LoginLog.create({
+        identity: username,
+        ip: req.ip,
+        userAgent: req.get("user-agent"),
+        success: false,
+        reason: "invalid_credentials",
+      });
       return res.status(401).json({message:"username hoặc password không chính xác"})
     }
 
     //kiểm tra password
+    if(user.isActive === false){
+      await LoginLog.create({
+        userId: user._id,
+        identity: username,
+        ip: req.ip,
+        userAgent: req.get("user-agent"),
+        success: false,
+        reason: "account_locked",
+      });
+      return res.status(403).json({message:"Tai khoan cua ban da bi khoa"})
+    }
+
     const passwordCorrect = await bcrypt.compare(password, user.hashedPassword);
     if(!passwordCorrect){
+      await LoginLog.create({
+        userId: user._id,
+        identity: username,
+        ip: req.ip,
+        userAgent: req.get("user-agent"),
+        success: false,
+        reason: "invalid_credentials",
+      });
       return res.status(401).json({message:"username hoặc password không chính xác"})
     }
 
@@ -72,11 +106,17 @@ export const signIn = async (req, res) =>{
         refreshToken,
         expiresAt:new Date(Date.now() + REFRESH_TOKEN_TTL),
       })
+      await LoginLog.create({
+        userId: user._id,
+        identity: username,
+        ip: req.ip,
+        userAgent: req.get("user-agent"),
+        success: true,
+        reason: "signed_in",
+      });
     //trả refesh Token về trong cookie
     res.cookie('refreshToken',refreshToken,{
-      httpOnly:true,
-      secure:true,
-      sameSite: 'none', //backend và frontend deloy riêng
+      ...refreshCookieOptions,
       maxAge:REFRESH_TOKEN_TTL,
     })
 
@@ -99,7 +139,7 @@ export const signOut = async (req, res) =>{
       // xóa refresh token trong session
       await Session.deleteOne({refreshToken: token})
     // xóa cookie
-    res.clearCookie('refreshToken')
+    res.clearCookie('refreshToken', refreshCookieOptions)
     }
     
     return res.sendStatus(204)
@@ -129,6 +169,13 @@ export const refresh = async (req,res) =>{
       return res.status(403).json({message:'Token đã hết hạn'})
     }
     //tạo access token mới
+    const user = await User.findById(session.userId).select("isActive");
+    if(!user || user.isActive === false){
+      await Session.deleteMany({userId: session.userId});
+      res.clearCookie('refreshToken', refreshCookieOptions);
+      return res.status(403).json({message:'Tai khoan khong ton tai hoac da bi khoa'})
+    }
+
     const accessToken =jwt.sign({
       userId: session.userId
     }, process.env.ACCESS_TOKEN_SECRET,{expiresIn:ACCESS_TOKEN_TTL});

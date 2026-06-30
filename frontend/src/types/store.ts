@@ -15,5 +15,6 @@ export interface AuthState {
   updateProfile: (data: Partial<Pick<User, "displayName" | "email" | "bio" | "phone" | "avatarUrl">>) => Promise<boolean>;
   uploadAvatar: (file: File) => Promise<boolean>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
+  googleSignIn: (credential: string) => Promise<boolean>;
 
 }

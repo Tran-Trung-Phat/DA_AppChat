@@ -4,22 +4,27 @@ import mongoose from "mongoose";
 
 export const createStory = async (req, res) => {
   try {
-    const { content, mediaType } = req.body;
+    const { content, mediaType, itemType } = req.body;
     const userId = req.user._id;
 
     let mediaUrl = "";
     if (req.file) {
-      mediaUrl = `${req.protocol}://${req.get("host")}/uploads/stories/${req.file.filename}`;
+      mediaUrl = (req.file.path && (req.file.path.startsWith("http://") || req.file.path.startsWith("https://")))
+        ? req.file.path
+        : `${req.protocol}://${req.get("host")}/uploads/stories/${req.file.filename}`;
     }
 
-    // Bài đăng tồn tại 100 năm (kiểu Facebook, không hết hạn)
-    const expiresAt = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000);
+    const isStory = itemType === "story";
+    const expiresAt = isStory
+      ? new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      : new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000); // 100 years
 
     const story = new Story({
       user: userId,
       mediaUrl,
       mediaType: mediaType || "text",
       content: content || "",
+      itemType: itemType || "post",
       expiresAt,
     });
 

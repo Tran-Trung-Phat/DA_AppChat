@@ -2,6 +2,10 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import User from "../models/user.js";
+import Friend from "../models/Friend.js";
+import FriendRequest from "../models/FriendRequest.js";
+import Story from "../models/Story.js";
+import mongoose from "mongoose";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsRoot = path.join(__dirname, "../../uploads");
@@ -107,7 +111,9 @@ export const uploadMeAvatar = async (req, res) => {
         }
 
         const previousAvatar = req.user.avatarUrl;
-        const avatarUrl = `${req.protocol}://${req.get("host")}/uploads/avatars/${req.file.filename}`;
+        const avatarUrl = (req.file.path && (req.file.path.startsWith("http://") || req.file.path.startsWith("https://")))
+            ? req.file.path
+            : `${req.protocol}://${req.get("host")}/uploads/avatars/${req.file.filename}`;
         const user = await User.findByIdAndUpdate(
             req.user._id,
             {$set: {avatarUrl}},
@@ -154,3 +160,118 @@ export const searchUsers = async (req, res) => {
 export const test = async (req,res) =>{
     return res.sendStatus(204);
 }
+
+export const getUserProfile = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ" });
+    }
+
+    const user = await User.findById(userId)
+      .select("-hashedPassword")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    // 1. Lấy danh sách bài viết riêng của user (chỉ bài đăng, không phải story 24h)
+    const posts = await Story.find({
+      user: userId,
+      status: "active",
+      itemType: "post",
+    })
+      .populate("user", "_id displayName username avatarUrl")
+      .populate("comments.user", "_id displayName username avatarUrl")
+      .sort({ createdAt: -1 });
+
+    // 2. Lấy thông tin bạn bè
+    const friends = await Friend.find({
+      $or: [
+        { userA: userId },
+        { userB: userId }
+      ]
+    });
+
+    const friendIds = friends.map((f) =>
+      f.userA.toString() === userId.toString() ? f.userB : f.userA
+    );
+
+    const friendsProfiles = await User.find({ _id: { $in: friendIds } })
+      .select("_id displayName username avatarUrl")
+      .limit(9)
+      .lean();
+
+    // 3. Trạng thái quan hệ bạn bè với người đang gửi request
+    let friendshipStatus = "none"; // none, sent, received, friends, blocked
+
+    if (userId.toString() !== req.user._id.toString()) {
+      const isBlocked = req.user.blockList?.some(
+        (blockedId) => blockedId.toString() === userId.toString()
+      );
+
+      if (isBlocked) {
+        friendshipStatus = "blocked";
+      } else {
+        const request = await FriendRequest.findOne({
+          $or: [
+            { from: req.user._id, to: userId },
+            { from: userId, to: req.user._id },
+          ],
+        });
+
+        if (request) {
+          friendshipStatus =
+            request.from.toString() === req.user._id.toString()
+              ? "sent"
+              : "received";
+        } else {
+          const isFriend = friends.some(
+            (f) =>
+              f.userA.toString() === req.user._id.toString() ||
+              f.userB.toString() === req.user._id.toString()
+          );
+          if (isFriend) {
+            friendshipStatus = "friends";
+          }
+        }
+      }
+    }
+
+    return res.status(200).json({
+      user,
+      posts,
+      friends: friendsProfiles,
+      totalFriends: friendIds.length,
+      friendshipStatus,
+    });
+  } catch (error) {
+    console.error("Lỗi lấy trang cá nhân:", error);
+    return res.status(500).json({ message: "Lỗi hệ thống khi lấy thông tin trang cá nhân" });
+  }
+};
+
+export const uploadMeCover = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Vui lòng chọn ảnh bìa" });
+    }
+
+    const coverUrl = (req.file.path && (req.file.path.startsWith("http://") || req.file.path.startsWith("https://")))
+      ? req.file.path
+      : `${req.protocol}://${req.get("host")}/uploads/covers/${req.file.filename}`;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: { coverUrl } },
+      { new: true, runValidators: true }
+    ).select("-hashedPassword");
+
+    return res.status(200).json({ user });
+  } catch (error) {
+    console.error("Lỗi khi upload ảnh bìa", error);
+    return res.status(500).json({ message: "Lỗi hệ thống khi tải lên ảnh bìa" });
+  }
+};

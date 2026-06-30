@@ -647,16 +647,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarFooter>
         <div className="flex items-center gap-2 rounded-lg border bg-background p-2">
-          <Avatar>
-            <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
-            <AvatarFallback>{initials(user?.displayName)}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{user?.displayName}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {user?.email}
-            </p>
-          </div>
+          <Link to="/profile" className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-85 transition-opacity">
+            <Avatar>
+              <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
+              <AvatarFallback>{initials(user?.displayName)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="truncate text-sm font-medium text-foreground">{user?.displayName}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {user?.email}
+              </p>
+            </div>
+          </Link>
           {user?.role === "admin" && (
             <Button size="icon-sm" variant="ghost" asChild>
               <Link to="/admin">

@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import LoginLog from '../models/LoginLog.js';
 import PasswordReset from '../models/PasswordReset.js';
+import { OAuth2Client } from 'google-auth-library';
 const isProduction = process.env.NODE_ENV === 'production';
 const refreshCookieOptions = {
   httpOnly:true,
@@ -212,6 +213,11 @@ export const changePassword = async (req, res) => {
       return res.status(404).json({ message: 'Nguoi dung khong ton tai' });
     }
 
+    // Tài khoản Google không có mật khẩu
+    if (!user.hashedPassword) {
+      return res.status(400).json({ message: 'Tai khoan dang nhap bang Google khong the doi mat khau' });
+    }
+
     const passwordCorrect = await bcrypt.compare(currentPassword, user.hashedPassword);
     if (!passwordCorrect) {
       return res.status(401).json({ message: 'Mat khau hien tai khong chinh xac' });
@@ -352,6 +358,131 @@ export const resetPassword = async (req, res) => {
     return res.status(200).json({ message: 'Dat lai mat khau thanh cong. Vui long dang nhap lai' });
   } catch (error) {
     console.error('Loi khi dat lai mat khau', error);
+    return res.status(500).json({ message: 'Loi he thong' });
+  }
+};
+
+// Đăng nhập bằng Google
+export const googleSignIn = async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({ message: 'Thieu Google credential' });
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      return res.status(500).json({ message: 'Google OAuth chua duoc cau hinh tren server' });
+    }
+
+    // Xac minh ID token voi Google
+    const client = new OAuth2Client(clientId);
+    let ticket;
+    try {
+      ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+    } catch (err) {
+      return res.status(401).json({ message: 'Google token khong hop le' });
+    }
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Khong lay duoc email tu tai khoan Google' });
+    }
+
+    // Tim user theo googleId hoac email
+    let user = await User.findOne({ googleId });
+
+    if (!user) {
+      // Tim theo email de lien ket tai khoan co san
+      user = await User.findOne({ email: email.toLowerCase() });
+
+      if (user) {
+        // Lien ket Google ID vao tai khoan da ton tai
+        user.googleId = googleId;
+        if (!user.avatarUrl && picture) {
+          user.avatarUrl = picture;
+        }
+        await user.save();
+      } else {
+        // Tao tai khoan moi
+        const baseUsername = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+        let username = baseUsername;
+        let attempts = 0;
+
+        while (await User.findOne({ username })) {
+          attempts++;
+          username = `${baseUsername}${Math.floor(Math.random() * 10000)}`;
+          if (attempts > 10) {
+            username = `${baseUsername}${Date.now()}`;
+            break;
+          }
+        }
+
+        user = await User.create({
+          username,
+          email: email.toLowerCase(),
+          displayName: name || email.split('@')[0],
+          googleId,
+          avatarUrl: picture || '',
+          hashedPassword: null,
+        });
+      }
+    }
+
+    // Kiem tra tai khoan bi khoa
+    if (user.isActive === false) {
+      await LoginLog.create({
+        userId: user._id,
+        identity: user.email,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        success: false,
+        reason: 'account_locked',
+      });
+      return res.status(403).json({ message: 'Tai khoan cua ban da bi khoa' });
+    }
+
+    // Tao accessToken va refreshToken
+    const accessToken = jwt.sign(
+      { userId: user._id },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: ACCESS_TOKEN_TTL }
+    );
+
+    const refreshToken = crypto.randomBytes(64).toString('hex');
+
+    await Session.create({
+      userId: user._id,
+      refreshToken,
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL),
+    });
+
+    await LoginLog.create({
+      userId: user._id,
+      identity: user.email,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+      success: true,
+      reason: 'google_signin',
+    });
+
+    res.cookie('refreshToken', refreshToken, {
+      ...refreshCookieOptions,
+      maxAge: REFRESH_TOKEN_TTL,
+    });
+
+    return res.status(200).json({
+      message: `Chao mung ${user.displayName}`,
+      accessToken,
+    });
+  } catch (error) {
+    console.error('Loi khi dang nhap bang Google:', error);
     return res.status(500).json({ message: 'Loi he thong' });
   }
 };

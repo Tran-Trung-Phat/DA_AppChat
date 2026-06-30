@@ -50,14 +50,27 @@ const formatConversation = (conversation) => {
 const isConversationMember = (conversation, userId) =>
   conversation.participants.some((p) => p.userId.toString() === userId.toString());
 
-const attachmentFromFile = (req, file) => ({
-  url: `${req.protocol}://${req.get("host")}/uploads/messages/${file.filename}`,
-  filename: file.filename,
-  originalName: file.originalname,
-  mimeType: file.mimetype,
-  size: file.size,
-  kind: file.mimetype.startsWith("image/") ? "image" : "file",
-});
+const attachmentFromFile = (req, file) => {
+  let kind = "file";
+  if (file.mimetype.startsWith("image/")) {
+    kind = "image";
+  } else if (file.mimetype.startsWith("audio/") || file.mimetype.includes("audio")) {
+    kind = "audio";
+  }
+
+  const url = (file.path && (file.path.startsWith("http://") || file.path.startsWith("https://")))
+    ? file.path
+    : `${req.protocol}://${req.get("host")}/uploads/messages/${file.filename}`;
+
+  return {
+    url,
+    filename: file.filename || file.originalname,
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    size: file.size,
+    kind,
+  };
+};
 
 const reverseGeocode = async (latitude, longitude) => {
   const params = new URLSearchParams({

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "react-router";
 import {
   CheckIcon,
   CrownIcon,
@@ -24,6 +25,7 @@ import {
   CornerUpLeft,
   PhoneIcon,
   VideoIcon,
+  MicIcon,
 } from "lucide-react";
 import { useCallStore } from "@/stores/useCallStore";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -205,6 +207,33 @@ function AttachmentView({
     );
   }
 
+  if (attachment.kind === "audio") {
+    return (
+      <div
+        className={`mt-2 flex flex-col gap-1.5 rounded-lg border p-3 min-w-[260px] max-w-80 shadow-inner ${
+          isMine
+            ? "border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
+            : "border-border bg-muted/40 text-foreground"
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs">
+            🎙️
+          </span>
+          <div className="min-w-0 flex-1">
+            <span className="block truncate text-xs font-semibold">Tin nhắn thoại</span>
+            <span className="block text-[10px] opacity-70">{formatBytes(attachment.size)}</span>
+          </div>
+        </div>
+        <audio
+          src={attachment.url}
+          controls
+          className="h-8 w-full max-w-full rounded mt-1 filter brightness-95 contrast-100"
+        />
+      </div>
+    );
+  }
+
   return (
     <a
       href={attachment.url}
@@ -348,6 +377,106 @@ const ChatWindowLayout = () => {
     null
   );
   const [replyingToMessage, setReplyingToMessage] = React.useState<Message | null>(null);
+
+  // Voice recording states
+  const [isRecording, setIsRecording] = React.useState(false);
+  const [recordingDuration, setRecordingDuration] = React.useState(0);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const audioStreamRef = React.useRef<MediaStream | null>(null);
+  const recordingIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const audioChunksRef = React.useRef<Blob[]>([]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          if (audioBlob.size > 0) {
+            const file = new File([audioBlob], `voice-message-${Date.now()}.webm`, {
+              type: "audio/webm",
+            });
+            await sendMessage("", [file]);
+          }
+        }
+        cleanupStream();
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error("Loi truy cap micro:", error);
+      toast.error("Không thể truy cập microphone. Vui lòng kiểm tra quyền thiết bị.");
+    }
+  };
+
+  const stopAndSendRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+      toast.info("Đã hủy ghi âm");
+    }
+  };
+
+  const cleanupStream = () => {
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach((track) => track.stop());
+      audioStreamRef.current = null;
+    }
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    setRecordingDuration(0);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
+
+  const formatDuration = (seconds: number) => {
+    const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+    const ss = String(seconds % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
   const [searchQuery, setSearchQuery] = React.useState("");
   const [pickerTab, setPickerTab] = React.useState<"emoji" | "sticker">(
     "emoji"
@@ -617,37 +746,55 @@ const ChatWindowLayout = () => {
 
   return (
     <section className="flex min-h-0 w-full flex-col overflow-hidden rounded-lg border bg-card text-card-foreground">
-      <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4">
-        <div className="relative">
-          <Avatar size="lg">
-            <AvatarImage
-              src={getConversationAvatar(selectedConversation, user?._id)}
-              alt={title}
-            />
-            <AvatarFallback>{initials(title)}</AvatarFallback>
-          </Avatar>
-          {selectedConversation.type === "direct" && (
-            <span
-              className={`absolute bottom-0 right-0 size-3 rounded-full border-2 border-background ${
-                isOnline ? "bg-emerald-500" : "bg-muted-foreground"
-              }`}
-            />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-sm font-semibold">{title}</h1>
-          <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-            <UsersIcon className="size-3.5" />
-            <span>
-              {typingText ||
-                (selectedConversation.type === "direct"
-                  ? isOnline
-                    ? "Dang online"
-                    : "Dang offline"
-                  : `${memberCount} thanh vien`)}
-            </span>
+      <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 bg-background">
+        {selectedConversation.type === "direct" && directPeerId ? (
+          <Link to={`/profile/${directPeerId}`} className="relative flex items-center gap-3 hover:opacity-85 transition-opacity min-w-0 flex-1">
+            <div className="relative">
+              <Avatar size="lg">
+                <AvatarImage
+                  src={getConversationAvatar(selectedConversation, user?._id)}
+                  alt={title}
+                />
+                <AvatarFallback>{initials(title)}</AvatarFallback>
+              </Avatar>
+              <span
+                className={`absolute bottom-0 right-0 size-3 rounded-full border-2 border-background ${
+                  isOnline ? "bg-emerald-500" : "bg-zinc-400"
+                }`}
+              />
+            </div>
+            <div className="min-w-0 text-left">
+              <h1 className="truncate text-sm font-semibold text-foreground">{title}</h1>
+              <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                <UsersIcon className="size-3.5" />
+                <span>
+                  {typingText || (isOnline ? "Đang online" : "Đang ngoại tuyến")}
+                </span>
+              </div>
+            </div>
+          </Link>
+        ) : (
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="relative">
+              <Avatar size="lg">
+                <AvatarImage
+                  src={getConversationAvatar(selectedConversation, user?._id)}
+                  alt={title}
+                />
+                <AvatarFallback>{initials(title)}</AvatarFallback>
+              </Avatar>
+            </div>
+            <div className="min-w-0 text-left">
+              <h1 className="truncate text-sm font-semibold">{title}</h1>
+              <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                <UsersIcon className="size-3.5" />
+                <span>
+                  {typingText || `${memberCount} thành viên`}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
         {selectedConversation.type === "direct" && !isDisabledChat && directPeer && (
           <div className="flex items-center gap-0.5">
             <Button
@@ -772,15 +919,17 @@ const ChatWindowLayout = () => {
                     }`}
                   >
                     {/* Avatar */}
-                    <Avatar className="mt-5 size-8 shrink-0">
-                      <AvatarImage
-                        src={isMine ? user?.avatarUrl : senderAvatar}
-                        alt={senderName}
-                      />
-                      <AvatarFallback className="text-xs">
-                        {initials(senderName)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <Link to={`/profile/${senderId}`} className="mt-5 shrink-0 hover:opacity-85 transition-opacity">
+                      <Avatar className="size-8">
+                        <AvatarImage
+                          src={isMine ? user?.avatarUrl : senderAvatar}
+                          alt={senderName}
+                        />
+                        <AvatarFallback className="text-xs">
+                          {initials(senderName)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Link>
 
                     {/* Message content */}
                     <div
@@ -789,7 +938,9 @@ const ChatWindowLayout = () => {
                       }`}
                     >
                       <span className="px-1 text-xs text-muted-foreground">
-                        {senderName}{" "}
+                        <Link to={`/profile/${senderId}`} className="font-semibold hover:underline hover:text-foreground">
+                          {senderName}
+                        </Link>{" "}
                         · {formatTime(message.createdAt)}
                         {message.editedAt && !isDeleted ? " · da sua" : ""}
                       </span>
@@ -1116,42 +1267,88 @@ const ChatWindowLayout = () => {
               event.target.value = "";
             }}
           />
-          <Button
-            type="button"
-            size="icon-lg"
-            variant="ghost"
-            disabled={Boolean(editingMessageId) || isDisabledChat}
-            onClick={() => fileInputRef.current?.click()}
-            aria-label="Dinh kem tep"
-          >
-            <PaperclipIcon />
-          </Button>
+          {isRecording ? (
+            <div className="flex flex-1 items-center justify-between rounded-lg bg-muted/65 px-4 py-2 border border-red-500/30 animate-pulse">
+              <div className="flex items-center gap-2">
+                <span className="flex size-2.5 rounded-full bg-red-500 animate-ping" />
+                <span className="text-xs font-semibold text-red-500">Đang ghi âm tin nhắn thoại...</span>
+                <span className="text-xs font-mono font-bold text-foreground bg-background px-1.5 py-0.5 rounded border">
+                  {formatDuration(recordingDuration)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-red-500 text-xs gap-1"
+                  onClick={cancelRecording}
+                >
+                  <XIcon className="size-3.5" /> Hủy
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="default"
+                  className="bg-red-500 hover:bg-red-600 text-white text-xs gap-1"
+                  onClick={stopAndSendRecording}
+                >
+                  <SendIcon className="size-3.5" /> Gửi
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Button
+                type="button"
+                size="icon-lg"
+                variant="ghost"
+                disabled={Boolean(editingMessageId) || isDisabledChat}
+                onClick={startRecording}
+                aria-label="Tin nhan thoai"
+                title="Ghi âm tin nhắn thoại"
+              >
+                <MicIcon className="size-5 text-muted-foreground hover:text-primary transition-colors" />
+              </Button>
 
-          <Textarea
-            ref={textareaRef}
-            value={draft}
-            disabled={isDisabledChat}
-            onChange={(event) => {
-              setDraft(event.target.value);
-              sendTypingStart();
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                handleSubmit();
-              }
-            }}
-            className="max-h-32 min-h-10 resize-none"
-            placeholder={textareaPlaceholder}
-          />
-          <Button
-            type="submit"
-            size="icon-lg"
-            disabled={(!draft.trim() && selectedFiles.length === 0) || sending || isDisabledChat}
-            aria-label={editingMessageId ? "Luu tin nhan" : "Gui tin nhan"}
-          >
-            {editingMessageId ? <CheckIcon /> : <SendIcon />}
-          </Button>
+              <Button
+                type="button"
+                size="icon-lg"
+                variant="ghost"
+                disabled={Boolean(editingMessageId) || isDisabledChat}
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="Dinh kem tep"
+              >
+                <PaperclipIcon />
+              </Button>
+
+              <Textarea
+                ref={textareaRef}
+                value={draft}
+                disabled={isDisabledChat}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  sendTypingStart();
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+                className="max-h-32 min-h-10 flex-1 resize-none"
+                placeholder={textareaPlaceholder}
+              />
+              <Button
+                type="submit"
+                size="icon-lg"
+                disabled={(!draft.trim() && selectedFiles.length === 0) || sending || isDisabledChat}
+                aria-label={editingMessageId ? "Luu tin nhan" : "Gui tin nhan"}
+              >
+                {editingMessageId ? <CheckIcon /> : <SendIcon />}
+              </Button>
+            </>
+          )}
         </div>
       </form>
 

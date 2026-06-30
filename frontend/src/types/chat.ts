@@ -52,7 +52,7 @@ export interface MessageAttachment {
   originalName: string;
   mimeType: string;
   size: number;
-  kind: "image" | "file";
+  kind: "image" | "file" | "audio";
 }
 
 export interface MessageLocationAddress {
@@ -111,6 +111,7 @@ export interface Story {
   views?: string[];
   likes: string[];
   comments: StoryComment[];
+  itemType?: "post" | "story";
   status: "active" | "deleted";
   createdAt: string;
   expiresAt: string;

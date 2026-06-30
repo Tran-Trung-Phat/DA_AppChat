@@ -5,7 +5,10 @@ import mongoose from "mongoose";
 import User from "../models/user.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, "../../.env") });
+dotenv.config({ path: path.join(__dirname, "../.env") });
+if (!process.env.MONGODB_CONNECTIONSTRING) {
+  dotenv.config({ path: path.join(__dirname, "../../.env") });
+}
 
 const identity = process.argv[2]?.trim().toLowerCase();
 

@@ -50,6 +50,12 @@ const storySchema = new mongoose.Schema(
         },
       },
     ],
+    itemType: {
+      type: String,
+      enum: ["post", "story"],
+      default: "post",
+      index: true,
+    },
     status: {
       type: String,
       enum: ["active", "deleted"],

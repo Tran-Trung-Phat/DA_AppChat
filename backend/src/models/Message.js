@@ -24,7 +24,7 @@ const attachmentSchema = new mongoose.Schema(
     },
     kind: {
       type: String,
-      enum: ["image", "file"],
+      enum: ["image", "file", "audio"],
       required: true,
     },
   },

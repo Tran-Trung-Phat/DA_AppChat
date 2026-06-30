@@ -140,4 +140,23 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ loading: false });
     }
   },
+
+  googleSignIn: async (credential) => {
+    try {
+      set({ loading: true });
+      const { accessToken } = await authService.googleSignIn(credential);
+
+      get().setAccessToken(accessToken);
+      await get().fetchMe();
+
+      toast.success("Chào mừng bạn đến với Moji");
+      return true;
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.response?.data?.message || "Đăng nhập bằng Google không thành công");
+      return false;
+    } finally {
+      set({ loading: false });
+    }
+  },
 }));

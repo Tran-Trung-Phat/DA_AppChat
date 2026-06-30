@@ -49,7 +49,7 @@ export const requireAdmin = (req, res, next) => {
 
 const ADMIN_PERMISSIONS = {
   super_admin: ["*"],
-  moderator: ["dashboard", "users", "messages", "groups", "reports", "media"],
+  moderator: ["dashboard", "users", "messages", "groups", "reports", "media", "stories"],
   support: ["dashboard", "users"],
 };
 

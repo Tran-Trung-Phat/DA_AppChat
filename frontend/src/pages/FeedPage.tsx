@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import {
   HeartIcon,
   MessageCircleIcon,
@@ -9,6 +9,11 @@ import {
   Trash2Icon,
   LoaderCircleIcon,
   CopyIcon,
+  PlusIcon,
+  XIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  EyeIcon,
 } from "lucide-react";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import {
@@ -28,11 +33,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { toast } from "sonner";
 import { socketService } from "@/services/socketService";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -117,7 +117,6 @@ function PostCard({
     }
   };
 
-  // Detect if content matches a gradient background pattern
   const bgGradient =
     story.mediaType === "text"
       ? BG_GRADIENTS.find((bg) => story.content?.includes(bg)) || BG_GRADIENTS[0]
@@ -125,21 +124,21 @@ function PostCard({
 
   return (
     <article className="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-shadow hover:shadow-md">
-      {/* Author Header */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-2">
-        <Avatar className="size-10 border">
-          <AvatarImage src={story.user?.avatarUrl} alt={story.user?.displayName} />
-          <AvatarFallback>{initials(story.user?.displayName)}</AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{story.user?.displayName}</p>
-          <p className="text-[11px] text-muted-foreground">
-            @{story.user?.username} · {timeAgo(story.createdAt)}
-          </p>
-        </div>
+        <Link to={`/profile/${story.user?._id}`} className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-85 transition-opacity">
+          <Avatar className="size-10 border">
+            <AvatarImage src={story.user?.avatarUrl} alt={story.user?.displayName} />
+            <AvatarFallback>{initials(story.user?.displayName)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1 text-left">
+            <p className="truncate text-sm font-semibold text-foreground">{story.user?.displayName}</p>
+            <p className="text-[11px] text-muted-foreground">
+              @{story.user?.username} · {timeAgo(story.createdAt)}
+            </p>
+          </div>
+        </Link>
       </div>
 
-      {/* Post Body */}
       {story.mediaType === "text" ? (
         <div
           className={`mx-4 my-2 flex min-h-[200px] items-center justify-center rounded-lg p-6 text-center text-lg font-bold text-white shadow-inner ${bgGradient}`}
@@ -168,7 +167,6 @@ function PostCard({
         </div>
       )}
 
-      {/* Stats Row */}
       <div className="flex items-center gap-4 px-4 py-1.5 text-xs text-muted-foreground">
         {story.likes.length > 0 && (
           <span className="flex items-center gap-1">
@@ -188,7 +186,6 @@ function PostCard({
 
       <Separator />
 
-      {/* Action Buttons */}
       <div className="grid grid-cols-3 divide-x divide-border">
         <button
           onClick={handleLike}
@@ -219,24 +216,26 @@ function PostCard({
         </button>
       </div>
 
-      {/* Comments Section (Expandable) */}
       {showComments && (
         <div className="border-t bg-muted/20 px-4 py-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
-          {/* Existing Comments */}
           {story.comments.length > 0 ? (
             <div className="space-y-2.5 max-h-[300px] overflow-y-auto">
               {story.comments.map((comment) => (
                 <div key={comment._id} className="group flex gap-2.5">
-                  <Avatar className="size-7 shrink-0 mt-0.5">
-                    <AvatarImage src={comment.user?.avatarUrl} />
-                    <AvatarFallback className="text-[10px]">
-                      {initials(comment.user?.displayName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
+                  <Link to={`/profile/${comment.user?._id}`} className="shrink-0 mt-0.5 hover:opacity-85 transition-opacity">
+                    <Avatar className="size-7">
+                      <AvatarImage src={comment.user?.avatarUrl} />
+                      <AvatarFallback className="text-[10px]">
+                        {initials(comment.user?.displayName)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Link>
+                  <div className="min-w-0 flex-1 text-left">
                     <div className="rounded-lg bg-card border px-3 py-2">
                       <p className="text-xs font-semibold">
-                        {comment.user?.displayName}
+                        <Link to={`/profile/${comment.user?._id}`} className="hover:underline text-foreground">
+                          {comment.user?.displayName}
+                        </Link>
                       </p>
                       <p className="text-sm mt-0.5 whitespace-pre-wrap break-words">
                         {comment.content}
@@ -268,7 +267,6 @@ function PostCard({
             </p>
           )}
 
-          {/* Comment Input */}
           <form onSubmit={handleSubmitComment} className="flex items-center gap-2">
             <Input
               value={commentDraft}
@@ -303,13 +301,13 @@ const FeedPage = () => {
   const {
     stories,
     conversations,
-    friends,
     loading,
     fetchStories,
     createStory,
     likeStory,
     commentStory,
     deleteComment,
+    viewStory,
     sendMessage,
     selectConversation,
     receiveSocketMessage,
@@ -321,20 +319,37 @@ const FeedPage = () => {
     setTyping,
   } = useChatStore();
 
-  // Create post state
+  // Create post/story states
   const [postContent, setPostContent] = React.useState("");
   const [postMediaType, setPostMediaType] = React.useState<"text" | "image" | "video">("text");
   const [postFile, setPostFile] = React.useState<File | null>(null);
   const [postFilePreview, setPostFilePreview] = React.useState("");
   const [postBgColor, setPostBgColor] = React.useState(BG_GRADIENTS[0]);
   const [creating, setCreating] = React.useState(false);
+  const [createType, setCreateType] = React.useState<"post" | "story">("post");
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
 
   // Share dialog
   const [shareDialogOpen, setShareDialogOpen] = React.useState(false);
   const [shareStory, setShareStory] = React.useState<Story | null>(null);
   const [shareQuery, setShareQuery] = React.useState("");
 
-  // Socket listeners (same as ChatAppPage)
+  // Lightbox Story Viewer states
+  const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
+  const [storyViewerOpen, setStoryViewerOpen] = React.useState(false);
+  const storyProgressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [storyProgress, setStoryProgress] = React.useState(0);
+
+  // Separate Stories (24h) and Posts (permanent)
+  const activeStories = React.useMemo(() => {
+    return stories.filter((s) => s.itemType === "story");
+  }, [stories]);
+
+  const activePosts = React.useMemo(() => {
+    return stories.filter((s) => s.itemType !== "story");
+  }, [stories]);
+
+  // Socket listeners
   React.useEffect(() => {
     if (!accessToken) return;
 
@@ -368,7 +383,6 @@ const FeedPage = () => {
       setTyping(conversationId, userId, false);
     });
 
-    // Call listeners
     socket.on("call:incoming", ({ fromUserId, fromUser, signalData, callType }) => {
       useCallStore.getState().handleIncomingCall(fromUserId, fromUser, signalData, callType);
     });
@@ -417,10 +431,50 @@ const FeedPage = () => {
     setTyping,
   ]);
 
-  // Fetch stories on mount
   React.useEffect(() => {
     fetchStories();
   }, [fetchStories]);
+
+  // Story Lightbox Auto-advancing logic
+  React.useEffect(() => {
+    if (!storyViewerOpen || activeStoryIndex === null) {
+      if (storyProgressTimerRef.current) {
+        clearInterval(storyProgressTimerRef.current);
+      }
+      return;
+    }
+
+    // Mark current story as viewed
+    const currentStory = activeStories[activeStoryIndex];
+    if (currentStory) {
+      viewStory(currentStory._id);
+    }
+
+    setStoryProgress(0);
+
+    storyProgressTimerRef.current = setInterval(() => {
+      setStoryProgress((prev) => {
+        if (prev >= 100) {
+          // Advance to next story
+          if (activeStoryIndex < activeStories.length - 1) {
+            setActiveStoryIndex((idx) => (idx !== null ? idx + 1 : null));
+          } else {
+            // Close viewer
+            setStoryViewerOpen(false);
+            setActiveStoryIndex(null);
+          }
+          return 0;
+        }
+        return prev + 2; // Advance progress
+      });
+    }, 100);
+
+    return () => {
+      if (storyProgressTimerRef.current) {
+        clearInterval(storyProgressTimerRef.current);
+      }
+    };
+  }, [storyViewerOpen, activeStoryIndex, activeStories, viewStory]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -441,6 +495,7 @@ const FeedPage = () => {
     setCreating(true);
 
     const formData = new FormData();
+    formData.append("itemType", createType);
     if (postMediaType === "text") {
       formData.append("content", postContent);
       formData.append("mediaType", "text");
@@ -460,6 +515,7 @@ const FeedPage = () => {
       setPostFile(null);
       setPostFilePreview("");
       setPostMediaType("text");
+      setCreateDialogOpen(false);
     }
   };
 
@@ -521,167 +577,125 @@ const FeedPage = () => {
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-medium">📰 Bảng tin</span>
             <span className="truncate text-xs text-muted-foreground">
-              Xem bài đăng, bình luận & chia sẻ
+              Xem bài đăng, tin 24h, bình luận & chia sẻ
             </span>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-muted/20">
           <div className="mx-auto max-w-xl space-y-4 px-4 py-5">
-            {/* Create Post Box */}
-            <form
-              onSubmit={handleCreatePost}
-              className="rounded-xl border bg-card p-4 shadow-sm space-y-3"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar className="size-10 border">
-                  <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
-                  <AvatarFallback>{initials(user?.displayName)}</AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-semibold">{user?.displayName}</span>
-              </div>
-
-              {/* Mode Selector */}
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={postMediaType === "text" ? "default" : "outline"}
+            {/* ─── Facebook-style Horizontal Stories Row ─── */}
+            <div className="rounded-xl border bg-card p-4 shadow-sm space-y-3">
+              <h3 className="text-xs font-bold text-muted-foreground tracking-wider uppercase">
+                Tin 24h
+              </h3>
+              <div
+                className="flex gap-3 overflow-x-auto py-2 no-scrollbar"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
+                {/* Create Story Button */}
+                <button
                   onClick={() => {
-                    setPostMediaType("text");
-                    setPostFile(null);
-                    setPostFilePreview("");
+                    setCreateType("story");
+                    setCreateDialogOpen(true);
                   }}
+                  className="flex flex-col items-center shrink-0 focus:outline-none group"
                 >
-                  ✏️ Viết bài
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={postMediaType !== "text" ? "default" : "outline"}
-                  asChild
-                >
-                  <label className="cursor-pointer">
-                    <ImagePlusIcon className="size-4 mr-1" />
-                    Ảnh / Video
-                    <input
-                      type="file"
-                      accept="image/*,video/*"
-                      className="sr-only"
-                      onChange={handleFileChange}
-                    />
-                  </label>
-                </Button>
-              </div>
-
-              {/* Text Mode */}
-              {postMediaType === "text" && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground mr-1">Màu nền:</span>
-                    {BG_GRADIENTS.map((bg) => (
-                      <button
-                        key={bg}
-                        type="button"
-                        onClick={() => setPostBgColor(bg)}
-                        className={`size-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                          postBgColor === bg ? "border-primary scale-110" : "border-transparent"
-                        } ${bg}`}
-                      />
-                    ))}
+                  <div className="relative flex size-14 items-center justify-center rounded-full border-2 border-dashed border-primary bg-primary/5 hover:bg-primary/10 transition-colors">
+                    <PlusIcon className="size-6 text-primary group-hover:scale-110 transition-transform" />
                   </div>
-                  <Textarea
-                    value={postContent}
-                    onChange={(e) => setPostContent(e.target.value)}
-                    placeholder="Bạn đang nghĩ gì?"
-                    className="min-h-[100px] resize-none"
-                    required
-                  />
-                  {postContent && (
-                    <div
-                      className={`flex items-center justify-center rounded-lg min-h-[150px] p-4 text-center text-white font-bold text-base shadow-inner ${postBgColor}`}
+                  <span className="mt-1.5 text-[10px] font-semibold text-foreground">
+                    Tạo tin
+                  </span>
+                </button>
+
+                {/* Friends Stories Bubbles */}
+                {activeStories.map((story, idx) => {
+                  const hasViewed = user?._id && story.views?.includes(user._id);
+                  return (
+                    <button
+                      key={story._id}
+                      onClick={() => {
+                        setActiveStoryIndex(idx);
+                        setStoryViewerOpen(true);
+                      }}
+                      className="flex flex-col items-center shrink-0 focus:outline-none"
                     >
-                      {postContent}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Media Mode */}
-              {postMediaType !== "text" && (
-                <div className="space-y-2">
-                  {postFilePreview && (
-                    <div className="relative overflow-hidden rounded-lg bg-muted max-h-[300px] flex items-center justify-center">
-                      {postMediaType === "video" ? (
-                        <video src={postFilePreview} controls className="max-h-[300px] max-w-full" />
-                      ) : (
-                        <img
-                          src={postFilePreview}
-                          alt="Preview"
-                          className="max-h-[300px] max-w-full object-contain"
-                        />
-                      )}
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="destructive"
-                        className="absolute top-2 right-2 size-7 rounded-full"
-                        onClick={() => {
-                          setPostFile(null);
-                          setPostFilePreview("");
-                          setPostMediaType("text");
-                        }}
+                      <div
+                        className={`relative p-0.5 rounded-full border-2 transition-transform hover:scale-105 ${
+                          hasViewed ? "border-muted-foreground/30" : "border-blue-500 shadow-md"
+                        }`}
                       >
-                        <Trash2Icon className="size-3.5" />
-                      </Button>
-                    </div>
-                  )}
-                  <Input
-                    value={postContent}
-                    onChange={(e) => setPostContent(e.target.value)}
-                    placeholder="Thêm mô tả..."
-                  />
-                </div>
-              )}
+                        <Avatar className="size-12">
+                          <AvatarImage src={story.user?.avatarUrl} />
+                          <AvatarFallback>{initials(story.user?.displayName)}</AvatarFallback>
+                        </Avatar>
+                        {story.mediaType !== "text" && (
+                          <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full bg-background border text-[10px] shadow-sm">
+                            📷
+                          </span>
+                        )}
+                      </div>
+                      <span className="mt-1 text-[9px] font-medium text-muted-foreground truncate max-w-[64px]">
+                        {story.user?._id === user?._id ? "Tin của bạn" : story.user?.displayName}
+                      </span>
+                    </button>
+                  );
+                })}
 
-              <Button type="submit" className="w-full" disabled={creating}>
-                {creating ? (
-                  <>
-                    <LoaderCircleIcon className="size-4 animate-spin mr-2" />
-                    Đang đăng...
-                  </>
-                ) : (
-                  "Đăng bài viết"
+                {activeStories.length === 0 && (
+                  <div className="flex flex-1 items-center justify-center h-14 italic text-xs text-muted-foreground">
+                    Chưa có tin mới nào từ bạn bè
+                  </div>
                 )}
-              </Button>
-            </form>
+              </div>
+            </div>
 
-            {/* Feed Stream */}
-            {stories.length === 0 && !loading && (
-              <div className="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
+            {/* ─── Create Post Card ─── */}
+            <div className="rounded-xl border bg-card p-4 shadow-sm flex items-center gap-3">
+              <Avatar className="size-10 border shrink-0">
+                <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
+                <AvatarFallback>{initials(user?.displayName)}</AvatarFallback>
+              </Avatar>
+              <button
+                onClick={() => {
+                  setCreateType("post");
+                  setCreateDialogOpen(true);
+                }}
+                className="flex-1 rounded-full bg-muted/65 hover:bg-muted px-4 py-2.5 text-left text-xs text-muted-foreground font-medium transition-colors"
+              >
+                Bạn đang nghĩ gì thế, {user?.displayName}?
+              </button>
+            </div>
+
+            {/* ─── Feed Stream ─── */}
+            {activePosts.length === 0 && !loading && (
+              <div className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
                 <span className="text-4xl">📭</span>
-                <p className="text-sm">
-                  Chưa có bài viết nào. Hãy đăng bài đầu tiên!
+                <p className="text-sm font-medium">
+                  Chưa có bài viết nào trên bảng tin.
                 </p>
               </div>
             )}
 
-            {stories.map((story) => (
-              <PostCard
-                key={story._id}
-                story={story}
-                userId={user?._id}
-                onLike={likeStory}
-                onComment={commentStory}
-                onDeleteComment={deleteComment}
-                onShare={handleShare}
-              />
-            ))}
+            <div className="space-y-4">
+              {activePosts.map((post) => (
+                <PostCard
+                  key={post._id}
+                  story={post}
+                  userId={user?._id}
+                  onLike={likeStory}
+                  onComment={commentStory}
+                  onDeleteComment={deleteComment}
+                  onShare={handleShare}
+                />
+              ))}
+            </div>
           </div>
         </main>
       </SidebarInset>
 
-      {/* Share Dialog */}
+      {/* ─── Share Dialog ─── */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -732,6 +746,326 @@ const FeedPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ─── Create Story/Post Dialog ─── */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {createType === "story" ? "Tạo tin 24h mới" : "Tạo bài viết mới"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreatePost} className="space-y-4">
+            {/* Toggle post/story type inside dialog */}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={createType === "post" ? "default" : "outline"}
+                onClick={() => setCreateType("post")}
+                className="flex-1"
+              >
+                📝 Bài viết (Mãi mãi)
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={createType === "story" ? "default" : "outline"}
+                onClick={() => setCreateType("story")}
+                className="flex-1"
+              >
+                ⏱️ Tin 24h (Tự xóa)
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* MediaType selector */}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={postMediaType === "text" ? "default" : "outline"}
+                onClick={() => {
+                  setPostMediaType("text");
+                  setPostFile(null);
+                  setPostFilePreview("");
+                }}
+              >
+                ✏️ Dạng chữ
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={postMediaType !== "text" ? "default" : "outline"}
+                asChild
+              >
+                <label className="cursor-pointer">
+                  <ImagePlusIcon className="size-4 mr-1 inline" />
+                  Ảnh / Video
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    className="sr-only"
+                    onChange={handleFileChange}
+                  />
+                </label>
+              </Button>
+            </div>
+
+            {postMediaType === "text" ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground mr-1">Màu nền:</span>
+                  {BG_GRADIENTS.map((bg) => (
+                    <button
+                      key={bg}
+                      type="button"
+                      onClick={() => setPostBgColor(bg)}
+                      className={`size-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                        postBgColor === bg ? "border-primary scale-110" : "border-transparent"
+                      } ${bg}`}
+                    />
+                  ))}
+                </div>
+                <Textarea
+                  value={postContent}
+                  onChange={(e) => setPostContent(e.target.value)}
+                  placeholder={
+                    createType === "story"
+                      ? "Viết tin của bạn..."
+                      : "Bạn đang nghĩ gì?"
+                  }
+                  className="min-h-[100px] resize-none"
+                  required
+                />
+                {postContent && (
+                  <div
+                    className={`flex items-center justify-center rounded-lg min-h-[150px] p-4 text-center text-white font-bold text-base shadow-inner ${postBgColor}`}
+                  >
+                    {postContent}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {postFilePreview && (
+                  <div className="relative overflow-hidden rounded-lg bg-muted max-h-[250px] flex items-center justify-center">
+                    {postMediaType === "video" ? (
+                      <video src={postFilePreview} controls className="max-h-[250px] max-w-full" />
+                    ) : (
+                      <img
+                        src={postFilePreview}
+                        alt="Preview"
+                        className="max-h-[250px] max-w-full object-contain"
+                      />
+                    )}
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="destructive"
+                      className="absolute top-2 right-2 size-7 rounded-full"
+                      onClick={() => {
+                        setPostFile(null);
+                        setPostFilePreview("");
+                        setPostMediaType("text");
+                      }}
+                    >
+                      <Trash2Icon className="size-3.5" />
+                    </Button>
+                  </div>
+                )}
+                <Input
+                  value={postContent}
+                  onChange={(e) => setPostContent(e.target.value)}
+                  placeholder="Thêm mô tả..."
+                />
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button type="submit" className="w-full" disabled={creating}>
+                {creating ? (
+                  <>
+                    <LoaderCircleIcon className="size-4 animate-spin mr-2" />
+                    Đang đăng...
+                  </>
+                ) : createType === "story" ? (
+                  "Đăng Tin 24h"
+                ) : (
+                  "Đăng Bài viết"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Fullscreen Story Lightbox Viewer ─── */}
+      {storyViewerOpen && activeStoryIndex !== null && activeStories[activeStoryIndex] && (
+        (() => {
+          const currentStory = activeStories[activeStoryIndex];
+          const bgGradient =
+            currentStory.mediaType === "text"
+              ? BG_GRADIENTS.find((bg) => currentStory.content?.includes(bg)) || BG_GRADIENTS[0]
+              : undefined;
+
+          const isMyStory = currentStory.user?._id === user?._id;
+
+          const handlePrev = () => {
+            if (activeStoryIndex > 0) {
+              setActiveStoryIndex(activeStoryIndex - 1);
+            }
+          };
+
+          const handleNext = () => {
+            if (activeStoryIndex < activeStories.length - 1) {
+              setActiveStoryIndex(activeStoryIndex + 1);
+            } else {
+              setStoryViewerOpen(false);
+              setActiveStoryIndex(null);
+            }
+          };
+
+          return (
+            <div className="fixed inset-0 z-50 flex flex-col justify-between bg-zinc-950/98 text-white p-4">
+              {/* Progress Bars Indicator */}
+              <div className="flex gap-1.5 w-full max-w-md mx-auto pt-2">
+                {activeStories.map((_, idx) => (
+                  <div key={idx} className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-blue-500 transition-all duration-100 ${
+                        idx < activeStoryIndex
+                          ? "w-full"
+                          : idx === activeStoryIndex
+                          ? `w-[${storyProgress}%]`
+                          : "w-0"
+                      }`}
+                      style={{
+                        width:
+                          idx < activeStoryIndex
+                            ? "100%"
+                            : idx === activeStoryIndex
+                            ? `${storyProgress}%`
+                            : "0%",
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Header inside Lightbox */}
+              <div className="flex items-center justify-between w-full max-w-md mx-auto mt-3 px-1">
+                <div className="flex items-center gap-2">
+                  <Avatar className="size-9 border border-white/20">
+                    <AvatarImage src={currentStory.user?.avatarUrl} />
+                    <AvatarFallback>{initials(currentStory.user?.displayName)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <span className="block text-xs font-semibold">
+                      {currentStory.user?.displayName}
+                    </span>
+                    <span className="block text-[9px] text-zinc-400">
+                      {timeAgo(currentStory.createdAt)} (Tin 24h)
+                    </span>
+                  </div>
+                </div>
+
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-full size-8 hover:bg-white/10 text-white"
+                  onClick={() => {
+                    setStoryViewerOpen(false);
+                    setActiveStoryIndex(null);
+                  }}
+                >
+                  <XIcon className="size-4" />
+                </Button>
+              </div>
+
+              {/* Main Content Area */}
+              <div className="relative flex flex-1 w-full max-w-md mx-auto my-4 items-center justify-center">
+                {/* Navigation Buttons */}
+                {activeStoryIndex > 0 && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute -left-12 top-1/2 -translate-y-1/2 size-9 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                    onClick={handlePrev}
+                  >
+                    <ChevronLeftIcon className="size-5" />
+                  </Button>
+                )}
+                {activeStoryIndex < activeStories.length - 1 && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute -right-12 top-1/2 -translate-y-1/2 size-9 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                    onClick={handleNext}
+                  >
+                    <ChevronRightIcon className="size-5" />
+                  </Button>
+                )}
+
+                {/* Display Body */}
+                <div className="w-full aspect-[9/16] max-h-[70vh] rounded-2xl overflow-hidden border border-white/10 bg-black flex items-center justify-center shadow-2xl">
+                  {currentStory.mediaType === "text" ? (
+                    <div
+                      className={`w-full h-full flex items-center justify-center p-6 text-center text-lg font-bold text-white leading-relaxed ${bgGradient}`}
+                    >
+                      {currentStory.content}
+                    </div>
+                  ) : (
+                    <div className="relative w-full h-full flex flex-col justify-between">
+                      {currentStory.mediaUrl && currentStory.mediaType === "image" && (
+                        <img
+                          src={currentStory.mediaUrl}
+                          alt=""
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+                      {currentStory.mediaUrl && currentStory.mediaType === "video" && (
+                        <video
+                          src={currentStory.mediaUrl}
+                          autoPlay
+                          playsInline
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+                      {currentStory.content && (
+                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 text-center">
+                          <p className="text-xs text-white leading-snug">
+                            {currentStory.content}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Viewers display at bottom for my stories */}
+              <div className="w-full max-w-md mx-auto pb-4 flex justify-center text-center">
+                {isMyStory ? (
+                  <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+                    <EyeIcon className="size-3.5" />
+                    <span>
+                      {currentStory.views && currentStory.views.length > 0
+                        ? `${currentStory.views.length} người xem`
+                        : "Chưa có người xem"}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-zinc-500 italic">
+                    Tin tự động biến mất sau 24h
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()
+      )}
 
       <CallOverlay />
     </SidebarProvider>

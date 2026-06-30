@@ -2,6 +2,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router";
+import { GoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,7 @@ export function SigninForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const { signIn } = useAuthStore();
+  const { signIn, googleSignIn } = useAuthStore();
   const navigate = useNavigate();
   const {
     register,
@@ -34,6 +35,15 @@ export function SigninForm({
 
     if (ok) {
       navigate("/");
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    if (credentialResponse.credential) {
+      const ok = await googleSignIn(credentialResponse.credential);
+      if (ok) {
+        navigate("/");
+      }
     }
   };
 
@@ -95,6 +105,22 @@ export function SigninForm({
                 Đăng nhập
               </Button>
 
+              <div className="relative flex items-center gap-4">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">Hoặc</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => {}}
+                  text="signin_with"
+                  shape="rectangular"
+                  width="100%"
+                />
+              </div>
+
               <div className="text-center text-sm">
                 Chưa có tài khoản?{" "}
                 <a href="/signup" className="underline underline-offset-4">
@@ -120,3 +146,4 @@ export function SigninForm({
     </div>
   );
 }
+

@@ -44,6 +44,7 @@ import {
 import { useCallStore } from "@/stores/useCallStore";
 import CallOverlay from "@/components/chat/CallOverlay";
 import type { Story, Conversation } from "@/types/chat";
+import { resolveImageUrl } from "@/lib/utils";
 
 const initials = (name?: string) =>
   (name || "M")
@@ -152,14 +153,14 @@ function PostCard({
           )}
           {story.mediaUrl && story.mediaType === "image" && (
             <img
-              src={story.mediaUrl}
+              src={resolveImageUrl(story.mediaUrl)}
               alt=""
               className="w-full rounded-lg object-cover max-h-[500px]"
             />
           )}
           {story.mediaUrl && story.mediaType === "video" && (
             <video
-              src={story.mediaUrl}
+              src={resolveImageUrl(story.mediaUrl)}
               controls
               className="w-full rounded-lg max-h-[500px]"
             />
@@ -1020,14 +1021,14 @@ const FeedPage = () => {
                     <div className="relative w-full h-full flex flex-col justify-between">
                       {currentStory.mediaUrl && currentStory.mediaType === "image" && (
                         <img
-                          src={currentStory.mediaUrl}
+                          src={resolveImageUrl(currentStory.mediaUrl)}
                           alt=""
                           className="w-full h-full object-contain"
                         />
                       )}
                       {currentStory.mediaUrl && currentStory.mediaType === "video" && (
                         <video
-                          src={currentStory.mediaUrl}
+                          src={resolveImageUrl(currentStory.mediaUrl)}
                           autoPlay
                           playsInline
                           className="w-full h-full object-contain"

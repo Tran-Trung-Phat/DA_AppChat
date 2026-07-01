@@ -20,6 +20,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const PORT =process.env.PORT || 5001;
 const CLIENT_URL = process.env.CLIENT_URL

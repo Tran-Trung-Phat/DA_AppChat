@@ -34,6 +34,7 @@ import { userService, type UserProfileResponse } from "@/services/userService";
 import CallOverlay from "@/components/chat/CallOverlay";
 import type { Story } from "@/types/chat";
 import api from "@/lib/axios";
+import { resolveImageUrl } from "@/lib/utils";
 
 // Helper components & functions from FeedPage
 const initials = (name?: string) =>
@@ -139,14 +140,14 @@ function ProfilePostCard({
           )}
           {story.mediaUrl && story.mediaType === "image" && (
             <img
-              src={story.mediaUrl}
+              src={resolveImageUrl(story.mediaUrl)}
               alt=""
               className="w-full rounded-lg object-cover max-h-[400px]"
             />
           )}
           {story.mediaUrl && story.mediaType === "video" && (
             <video
-              src={story.mediaUrl}
+              src={resolveImageUrl(story.mediaUrl)}
               controls
               className="w-full rounded-lg max-h-[400px]"
             />
@@ -483,7 +484,7 @@ const ProfilePage = () => {
               <div className="relative h-48 md:h-64 w-full bg-gradient-to-r from-zinc-300 to-zinc-400 overflow-hidden">
                 {profileUser.coverUrl ? (
                   <img
-                    src={profileUser.coverUrl}
+                    src={resolveImageUrl(profileUser.coverUrl)}
                     alt="Cover"
                     className="w-full h-full object-cover"
                   />

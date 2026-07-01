@@ -65,6 +65,7 @@ import type {
   MessageAttachment,
   MessageLocation,
 } from "@/types/chat";
+import { resolveImageUrl } from "@/lib/utils";
 
 const EMOJIS = [
   "😀",
@@ -197,9 +198,9 @@ function AttachmentView({
 }) {
   if (attachment.kind === "image") {
     return (
-      <a href={attachment.url} target="_blank" rel="noreferrer">
+      <a href={resolveImageUrl(attachment.url)} target="_blank" rel="noreferrer">
         <img
-          src={attachment.url}
+          src={resolveImageUrl(attachment.url)}
           alt={attachment.originalName}
           className="mt-2 max-h-72 max-w-full rounded-md object-contain"
         />

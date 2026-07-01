@@ -349,6 +349,7 @@ const ReactionPicker = ({
 const ChatWindowLayout = () => {
   const { user } = useAuthStore();
   const startCall = useCallStore((state) => state.startCall);
+  const startGroupCall = useCallStore((state) => state.startGroupCall);
   const {
     conversations,
     selectedConversationId,
@@ -814,6 +815,30 @@ const ChatWindowLayout = () => {
               variant="ghost"
               onClick={() => startCall(directPeer as any, "video")}
               title="Gọi video"
+              className="text-muted-foreground hover:text-primary size-9 p-0 rounded-full"
+            >
+              <VideoIcon className="size-4.5" />
+            </Button>
+          </div>
+        )}
+        {selectedConversation.type === "group" && (
+          <div className="flex items-center gap-0.5">
+            <Button
+              type="button"
+              size="icon-lg"
+              variant="ghost"
+              onClick={() => startGroupCall(selectedConversation._id, "audio")}
+              title="Gọi thoại nhóm"
+              className="text-muted-foreground hover:text-primary size-9 p-0 rounded-full"
+            >
+              <PhoneIcon className="size-4.5" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-lg"
+              variant="ghost"
+              onClick={() => startGroupCall(selectedConversation._id, "video")}
+              title="Gọi video nhóm"
               className="text-muted-foreground hover:text-primary size-9 p-0 rounded-full"
             >
               <VideoIcon className="size-4.5" />

@@ -32,6 +32,18 @@ type ServerToClientEvents = {
   "call:ended": () => void;
   "call:busied": () => void;
   "call:failed": (payload: { reason: string }) => void;
+
+  // Group calling events
+  "group-call:incoming": (payload: {
+    conversationId: string;
+    caller: any;
+    callType: "audio" | "video";
+  }) => void;
+  "group-call:user-joined": (payload: { userId: string }) => void;
+  "group-call:user-left": (payload: { userId: string }) => void;
+  "group-call:user-declined": (payload: { userId: string }) => void;
+  "group-call:join-success": (payload: { existingUsers: string[] }) => void;
+  "group-call:signal": (payload: { fromUserId: string; signalData: any }) => void;
 };
 
 type ClientToServerEvents = {
@@ -49,6 +61,13 @@ type ClientToServerEvents = {
   "call:decline": (payload: { toUserId: string }) => void;
   "call:end": (payload: { toUserId: string }) => void;
   "call:busy": (payload: { toUserId: string }) => void;
+
+  // Group calling events
+  "group-call:initiate": (payload: { conversationId: string; callType: "audio" | "video" }) => void;
+  "group-call:join": (payload: { conversationId: string }) => void;
+  "group-call:signal": (payload: { conversationId: string; toUserId: string; signalData: any }) => void;
+  "group-call:leave": (payload: { conversationId: string }) => void;
+  "group-call:decline": (payload: { conversationId: string }) => void;
 };
 
 let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;

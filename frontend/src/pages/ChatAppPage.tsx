@@ -101,6 +101,31 @@ const ChatAppPage = () => {
       useCallStore.getState().handleCallFailed(reason);
     });
 
+    // Group calling listeners
+    socket.on("group-call:incoming", ({ conversationId, caller, callType }) => {
+      useCallStore.getState().handleIncomingGroupCall(conversationId, caller, callType);
+    });
+
+    socket.on("group-call:user-joined", ({ userId }) => {
+      void useCallStore.getState().handleGroupUserJoined(userId);
+    });
+
+    socket.on("group-call:user-left", ({ userId }) => {
+      useCallStore.getState().handleGroupUserLeft(userId);
+    });
+
+    socket.on("group-call:user-declined", ({ userId }) => {
+      useCallStore.getState().handleGroupUserDeclined(userId);
+    });
+
+    socket.on("group-call:join-success", ({ existingUsers }) => {
+      void useCallStore.getState().handleGroupJoinSuccess(existingUsers);
+    });
+
+    socket.on("group-call:signal", ({ fromUserId, signalData }) => {
+      void useCallStore.getState().handleGroupSignal(fromUserId, signalData);
+    });
+
     return () => {
       socket.off("message:new");
       socket.off("message:updated");
@@ -118,6 +143,12 @@ const ChatAppPage = () => {
       socket.off("call:ended");
       socket.off("call:busied");
       socket.off("call:failed");
+      socket.off("group-call:incoming");
+      socket.off("group-call:user-joined");
+      socket.off("group-call:user-left");
+      socket.off("group-call:user-declined");
+      socket.off("group-call:join-success");
+      socket.off("group-call:signal");
       socketService.disconnect();
     };
   }, [

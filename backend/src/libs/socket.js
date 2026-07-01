@@ -1,9 +1,11 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import User from "../models/user.js";
+import Conversation from "../models/Conversation.js";
 
 let io;
 const onlineUsers = new Map();
+const activeGroupCalls = new Map();
 
 const addOnlineSocket = (userId, socketId) => {
   const sockets = onlineUsers.get(userId) ?? new Set();
@@ -161,7 +163,118 @@ export const initSocket = (httpServer) => {
       io.to(userRoom(toUserId)).emit("call:busied");
     });
 
+    // --- Group Calling events ---
+    socket.on("group-call:initiate", async ({ conversationId, callType }) => {
+      if (!conversationId) return;
+
+      try {
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) return;
+
+        // Check if user is a participant
+        const isMember = conversation.participants.some(
+          (p) => p.userId.toString() === socket.userId
+        );
+        if (!isMember) return;
+
+        const caller = await User.findById(socket.userId).select("displayName avatarUrl username");
+        if (!caller) return;
+
+        // Initialize activeGroupCalls room set with the caller
+        activeGroupCalls.set(conversationId, new Set([socket.userId]));
+        socket.join(`group-call:${conversationId}`);
+
+        // Broadcast group-call:incoming to all other group participants
+        conversation.participants.forEach((p) => {
+          const memberId = p.userId.toString();
+          if (memberId !== socket.userId) {
+            io.to(userRoom(memberId)).emit("group-call:incoming", {
+              conversationId,
+              caller: {
+                _id: caller._id,
+                displayName: caller.displayName,
+                avatarUrl: caller.avatarUrl,
+                username: caller.username,
+              },
+              callType,
+            });
+          }
+        });
+      } catch (err) {
+        console.error("Loi khi group-call:initiate:", err);
+      }
+    });
+
+    socket.on("group-call:join", ({ conversationId }) => {
+      if (!conversationId) return;
+
+      const callUsers = activeGroupCalls.get(conversationId) || new Set();
+      const existingUsers = Array.from(callUsers);
+
+      // Join room and update state
+      socket.join(`group-call:${conversationId}`);
+      callUsers.add(socket.userId);
+      activeGroupCalls.set(conversationId, callUsers);
+
+      // Notify other call members about the joiner
+      socket.to(`group-call:${conversationId}`).emit("group-call:user-joined", {
+        userId: socket.userId,
+      });
+
+      // Send join-success to joining user with current active user list
+      socket.emit("group-call:join-success", { existingUsers });
+    });
+
+    socket.on("group-call:signal", ({ conversationId, toUserId, signalData }) => {
+      if (!conversationId || !toUserId) return;
+      io.to(userRoom(toUserId)).emit("group-call:signal", {
+        fromUserId: socket.userId,
+        signalData,
+      });
+    });
+
+    socket.on("group-call:leave", ({ conversationId }) => {
+      if (!conversationId) return;
+
+      const callUsers = activeGroupCalls.get(conversationId);
+      if (callUsers) {
+        callUsers.delete(socket.userId);
+        if (callUsers.size === 0) {
+          activeGroupCalls.delete(conversationId);
+        } else {
+          activeGroupCalls.set(conversationId, callUsers);
+        }
+      }
+
+      socket.leave(`group-call:${conversationId}`);
+      socket.to(`group-call:${conversationId}`).emit("group-call:user-left", {
+        userId: socket.userId,
+      });
+    });
+
+    socket.on("group-call:decline", ({ conversationId }) => {
+      if (!conversationId) return;
+      socket.to(`group-call:${conversationId}`).emit("group-call:user-declined", {
+        userId: socket.userId,
+      });
+    });
+
     socket.on("disconnect", () => {
+      // Clean up any active group calls this user was in
+      for (const [conversationId, callUsers] of activeGroupCalls.entries()) {
+        if (callUsers.has(socket.userId)) {
+          callUsers.delete(socket.userId);
+          if (callUsers.size === 0) {
+            activeGroupCalls.delete(conversationId);
+          } else {
+            activeGroupCalls.set(conversationId, callUsers);
+            io.to(`group-call:${conversationId}`).emit("group-call:user-left", {
+              userId: socket.userId,
+            });
+          }
+        }
+      }
+
       if (removeOnlineSocket(socket.userId, socket.id)) {
         io.emit("presence:changed", {
           userId: socket.userId,

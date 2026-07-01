@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import { socketService } from "@/services/socketService";
 import type { UserSummary } from "@/types/chat";
+import { useChatStore } from "./useChatStore";
 
 // Programmable sound synthesizer using browser's AudioContext (no static file download needed!)
 let audioCtx: AudioContext | null = null;
@@ -78,6 +79,20 @@ interface CallState {
   peerConnection: RTCPeerConnection | null;
   incomingSignalData: any | null;
 
+  // Group calling states
+  groupCallActive: boolean;
+  groupCallState: "idle" | "calling" | "ringing" | "connected";
+  groupCallType: "audio" | "video" | null;
+  groupConversationId: string | null;
+  groupCallPeers: Array<{
+    userId: string;
+    displayName: string;
+    avatarUrl: string | null;
+    stream: MediaStream | null;
+    peerConnection: RTCPeerConnection | null;
+  }>;
+  groupCallCaller: UserSummary | null;
+
   startCall: (toUser: UserSummary, type: "audio" | "video") => Promise<void>;
   acceptIncomingCall: () => Promise<void>;
   declineIncomingCall: () => void;
@@ -91,7 +106,31 @@ interface CallState {
   handleCallEnded: () => void;
   handleCallDeclined: () => void;
   handleCallFailed: (reason: string) => void;
+
+  // Group calling methods
+  startGroupCall: (conversationId: string, type: "audio" | "video") => Promise<void>;
+  joinGroupCall: (conversationId: string) => Promise<void>;
+  acceptIncomingGroupCall: () => Promise<void>;
+  declineIncomingGroupCall: () => void;
+  leaveGroupCall: () => void;
+  initiatePeerConnection: (peerId: string, isInitiator: boolean) => Promise<RTCPeerConnection>;
+
+  handleIncomingGroupCall: (conversationId: string, caller: UserSummary, callType: "audio" | "video") => void;
+  handleGroupUserJoined: (userId: string) => Promise<void>;
+  handleGroupUserLeft: (userId: string) => void;
+  handleGroupUserDeclined: (userId: string) => void;
+  handleGroupJoinSuccess: (existingUsers: string[]) => Promise<void>;
+  handleGroupSignal: (fromUserId: string, signalData: any) => Promise<void>;
 }
+
+const getMemberInfo = (userId: string) => {
+  const conversations = useChatStore.getState().conversations;
+  for (const conv of conversations) {
+    const member = conv.participants.find((p) => p._id === userId);
+    if (member) return member;
+  }
+  return { _id: userId, displayName: "Người dùng", avatarUrl: null };
+};
 
 const rtcConfig: RTCConfiguration = {
   iceServers: [
@@ -135,6 +174,14 @@ export const useCallStore = create<CallState>((set, get) => {
     remoteStream: null,
     peerConnection: null,
     incomingSignalData: null,
+
+    // Group calling initial states
+    groupCallActive: false,
+    groupCallState: "idle",
+    groupCallType: null,
+    groupConversationId: null,
+    groupCallPeers: [],
+    groupCallCaller: null,
 
     startCall: async (toUser, type) => {
       try {
@@ -340,6 +387,291 @@ export const useCallStore = create<CallState>((set, get) => {
         toast.error("Cuộc gọi thất bại");
       }
       get().endCall(false);
+    },
+
+    startGroupCall: async (conversationId, type) => {
+      try {
+        set({
+          groupCallActive: true,
+          groupCallState: "connected",
+          groupCallType: type,
+          groupConversationId: conversationId,
+          groupCallPeers: [],
+          groupCallCaller: null,
+          isMuted: false,
+          isVideoOff: false,
+        });
+
+        // Ask for media permissions
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: type === "video",
+        });
+
+        set({ localStream: stream });
+
+        socketService.getSocket()?.emit("group-call:initiate", {
+          conversationId,
+          callType: type,
+        });
+      } catch (error) {
+        console.error("Lỗi khi khởi tạo cuộc gọi nhóm:", error);
+        toast.error("Không thể truy cập camera hoặc micro");
+        get().leaveGroupCall();
+      }
+    },
+
+    joinGroupCall: async (conversationId) => {
+      try {
+        const { groupCallType } = get();
+        const type = groupCallType || "audio";
+
+        set({
+          groupCallActive: true,
+          groupCallState: "connected",
+          groupConversationId: conversationId,
+          isMuted: false,
+          isVideoOff: false,
+        });
+
+        stopRingtone();
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: type === "video",
+        });
+
+        set({ localStream: stream });
+
+        socketService.getSocket()?.emit("group-call:join", {
+          conversationId,
+        });
+      } catch (error) {
+        console.error("Lỗi khi tham gia cuộc gọi nhóm:", error);
+        toast.error("Không thể truy cập camera hoặc micro");
+        get().leaveGroupCall();
+      }
+    },
+
+    acceptIncomingGroupCall: async () => {
+      const { groupConversationId } = get();
+      if (!groupConversationId) return;
+      await get().joinGroupCall(groupConversationId);
+    },
+
+    declineIncomingGroupCall: () => {
+      const { groupConversationId } = get();
+      if (groupConversationId) {
+        socketService.getSocket()?.emit("group-call:decline", {
+          conversationId: groupConversationId,
+        });
+      }
+      stopRingtone();
+      set({
+        groupCallActive: false,
+        groupCallState: "idle",
+        groupCallType: null,
+        groupConversationId: null,
+        groupCallPeers: [],
+        groupCallCaller: null,
+        localStream: null,
+      });
+    },
+
+    leaveGroupCall: () => {
+      const { groupConversationId, localStream, groupCallPeers } = get();
+      stopRingtone();
+
+      if (groupConversationId) {
+        socketService.getSocket()?.emit("group-call:leave", {
+          conversationId: groupConversationId,
+        });
+      }
+
+      if (localStream) {
+        localStream.getTracks().forEach((track) => track.stop());
+      }
+
+      groupCallPeers.forEach((peer) => {
+        if (peer.peerConnection) {
+          peer.peerConnection.onicecandidate = null;
+          peer.peerConnection.ontrack = null;
+          peer.peerConnection.close();
+        }
+      });
+
+      set({
+        groupCallActive: false,
+        groupCallState: "idle",
+        groupCallType: null,
+        groupConversationId: null,
+        groupCallPeers: [],
+        groupCallCaller: null,
+        localStream: null,
+        isMuted: false,
+        isVideoOff: false,
+      });
+    },
+
+    initiatePeerConnection: async (peerId, isInitiator) => {
+      const pc = new RTCPeerConnection(rtcConfig);
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate && get().groupConversationId) {
+          socketService.getSocket()?.emit("group-call:signal", {
+            conversationId: get().groupConversationId!,
+            toUserId: peerId,
+            signalData: { type: "candidate", candidate: event.candidate },
+          });
+        }
+      };
+
+      pc.ontrack = (event) => {
+        if (event.streams && event.streams[0]) {
+          set((state) => ({
+            groupCallPeers: state.groupCallPeers.map((p) =>
+              p.userId === peerId ? { ...p, stream: event.streams[0] } : p
+            ),
+          }));
+        }
+      };
+
+      const localStream = get().localStream;
+      if (localStream) {
+        localStream.getTracks().forEach((track) => {
+          pc.addTrack(track, localStream);
+        });
+      }
+
+      const member = getMemberInfo(peerId);
+      set((state) => ({
+        groupCallPeers: [
+          ...state.groupCallPeers.filter((p) => p.userId !== peerId),
+          {
+            userId: peerId,
+            displayName: member.displayName || "Người dùng",
+            avatarUrl: member.avatarUrl || null,
+            stream: null,
+            peerConnection: pc,
+          },
+        ],
+      }));
+
+      if (isInitiator) {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socketService.getSocket()?.emit("group-call:signal", {
+            conversationId: get().groupConversationId!,
+            toUserId: peerId,
+            signalData: offer,
+          });
+        } catch (err) {
+          console.error("Lỗi khi tạo offer cho peer:", peerId, err);
+        }
+      }
+
+      return pc;
+    },
+
+    handleIncomingGroupCall: (conversationId, caller, callType) => {
+      const { callActive, groupCallActive } = get();
+      if (callActive || groupCallActive) {
+        return;
+      }
+
+      set({
+        groupCallActive: true,
+        groupCallState: "ringing",
+        groupCallType: callType,
+        groupConversationId: conversationId,
+        groupCallCaller: caller,
+        groupCallPeers: [],
+        isMuted: false,
+        isVideoOff: false,
+        localStream: null,
+      });
+
+      playRingtone("ringing");
+    },
+
+    handleGroupUserJoined: async (userId) => {
+      // Add the user as connecting
+      const member = getMemberInfo(userId);
+      set((state) => {
+        const exists = state.groupCallPeers.some((p) => p.userId === userId);
+        if (exists) return {};
+        return {
+          groupCallPeers: [
+            ...state.groupCallPeers,
+            {
+              userId,
+              displayName: member.displayName || "Người dùng",
+              avatarUrl: member.avatarUrl || null,
+              stream: null,
+              peerConnection: null,
+            },
+          ],
+        };
+      });
+    },
+
+    handleGroupUserLeft: (userId) => {
+      const { groupCallPeers } = get();
+      const peer = groupCallPeers.find((p) => p.userId === userId);
+      if (peer?.peerConnection) {
+        peer.peerConnection.onicecandidate = null;
+        peer.peerConnection.ontrack = null;
+        peer.peerConnection.close();
+      }
+
+      set((state) => ({
+        groupCallPeers: state.groupCallPeers.filter((p) => p.userId !== userId),
+      }));
+
+      toast.info(`${peer?.displayName || "Một thành viên"} đã rời cuộc gọi`);
+    },
+
+    handleGroupUserDeclined: (userId) => {
+      const member = getMemberInfo(userId);
+      toast.info(`${member.displayName || "Một thành viên"} đã từ chối cuộc gọi`);
+    },
+
+    handleGroupJoinSuccess: async (existingUsers) => {
+      // Loop over existing users and initiate peer connection
+      for (const userId of existingUsers) {
+        if (userId !== socketService.getSocket()?.id) {
+          await get().initiatePeerConnection(userId, true);
+        }
+      }
+    },
+
+    handleGroupSignal: async (fromUserId, signalData) => {
+      let peer = get().groupCallPeers.find((p) => p.userId === fromUserId);
+      let pc = peer?.peerConnection;
+
+      if (!pc) {
+        pc = await get().initiatePeerConnection(fromUserId, false);
+      }
+
+      try {
+        if (signalData.type === "offer") {
+          await pc.setRemoteDescription(new RTCSessionDescription(signalData));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socketService.getSocket()?.emit("group-call:signal", {
+            conversationId: get().groupConversationId!,
+            toUserId: fromUserId,
+            signalData: answer,
+          });
+        } else if (signalData.type === "answer") {
+          await pc.setRemoteDescription(new RTCSessionDescription(signalData));
+        } else if (signalData.type === "candidate") {
+          await pc.addIceCandidate(new RTCIceCandidate(signalData.candidate));
+        }
+      } catch (err) {
+        console.error("Lỗi khi xử lý tín hiệu group call từ:", fromUserId, err);
+      }
     },
   };
 });

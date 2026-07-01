@@ -22,10 +22,13 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 const app = express();
 const server = http.createServer(app);
 const PORT =process.env.PORT || 5001;
-const CLIENT_URL = process.env.CLIENT_URL || [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-];
+const CLIENT_URL = process.env.CLIENT_URL
+  ? (process.env.CLIENT_URL.includes(",") ? process.env.CLIENT_URL.split(",").map(url => url.trim()) : process.env.CLIENT_URL)
+  : [
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'https://appchat-frontend-lzyt.onrender.com',
+    ];
 initSocket(server);
 
 // Middleware

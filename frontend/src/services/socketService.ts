@@ -31,8 +31,7 @@ type ClientToServerEvents = {
 
 let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 
-const socketURL =
-  import.meta.env.MODE === "development" ? "http://localhost:5001" : "/";
+const socketURL = import.meta.env.VITE_API_URL || "/";
 
 export const socketService = {
   connect: (accessToken: string) => {

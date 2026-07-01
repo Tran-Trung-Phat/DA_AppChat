@@ -147,6 +147,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     hydrate,
     selectConversation,
     startDirectConversation,
+    startGroupConversation,
     searchUsers,
     sendFriendRequest,
     acceptFriendRequest,
@@ -183,6 +184,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [storyBgColor, setStoryBgColor] = React.useState("bg-gradient-to-tr from-purple-500 to-indigo-600");
   const [viewStoryOpen, setViewStoryOpen] = React.useState(false);
   const [viewStoryIndex, setViewStoryIndex] = React.useState(0);
+  const [createGroupOpen, setCreateGroupOpen] = React.useState(false);
+  const [groupName, setGroupName] = React.useState("");
+  const [selectedFriends, setSelectedFriends] = React.useState<string[]>([]);
+
+  const handleCreateGroupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!groupName.trim()) {
+      toast.error("Vui lòng nhập tên nhóm");
+      return;
+    }
+    if (selectedFriends.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 thành viên");
+      return;
+    }
+
+    const success = await startGroupConversation(groupName.trim(), selectedFriends);
+    if (success) {
+      setCreateGroupOpen(false);
+      setGroupName("");
+      setSelectedFriends([]);
+      navigate("/");
+    }
+  };
+
   const [passwordForm, setPasswordForm] = React.useState({
     currentPassword: "",
     newPassword: "",
@@ -521,7 +546,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
         <SidebarSeparator />
         <SidebarGroup>
-          <SidebarGroupLabel>Cuộc trò chuyện</SidebarGroupLabel>
+          <div className="flex items-center justify-between pr-2">
+            <SidebarGroupLabel>Cuộc trò chuyện</SidebarGroupLabel>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => setCreateGroupOpen(true)}
+              title="Tạo nhóm chat"
+              className="size-6 text-muted-foreground hover:text-foreground"
+            >
+              <PlusIcon className="size-3.5" />
+            </Button>
+          </div>
           <SidebarGroupContent>
             <div className="relative mb-2">
               <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -1016,6 +1052,73 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </DialogContent>
             </Dialog>
           )}
+
+          {/* Create Group Dialog */}
+          <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Tạo nhóm chat mới</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreateGroupSubmit} className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <label htmlFor="groupName" className="text-xs font-semibold">Tên nhóm</label>
+                  <Input
+                    id="groupName"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    placeholder="Nhập tên nhóm chat..."
+                    required
+                    className="h-9 text-xs"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold flex justify-between">
+                    <span>Chọn thành viên</span>
+                    <span className="text-muted-foreground">{selectedFriends.length} đã chọn</span>
+                  </label>
+                  {friends.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic py-4 text-center">Bạn chưa có bạn bè nào để thêm vào nhóm.</p>
+                  ) : (
+                    <div className="max-h-[180px] overflow-y-auto border border-border rounded-md p-1 space-y-1 bg-muted/10">
+                      {friends.map((friend) => {
+                        const isChecked = selectedFriends.includes(friend._id);
+                        return (
+                          <label
+                            key={friend._id}
+                            className="flex items-center justify-between p-1.5 hover:bg-muted/50 rounded-md transition-colors cursor-pointer select-none"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Avatar size="sm">
+                                <AvatarImage src={friend.avatarUrl} />
+                                <AvatarFallback>{initials(friend.displayName)}</AvatarFallback>
+                              </Avatar>
+                              <span className="text-xs font-medium">{friend.displayName}</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                if (isChecked) {
+                                  setSelectedFriends(selectedFriends.filter((id) => id !== friend._id));
+                                } else {
+                                  setSelectedFriends([...selectedFriends, friend._id]);
+                                }
+                              }}
+                              className="size-4 accent-primary cursor-pointer rounded"
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <DialogFooter className="pt-2 gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => setCreateGroupOpen(false)}>Hủy</Button>
+                  <Button type="submit" size="sm" disabled={!groupName.trim() || selectedFriends.length === 0}>Tạo nhóm</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
 
           <Button size="icon-sm" variant="ghost" onClick={signOut}>
             <LogOutIcon />

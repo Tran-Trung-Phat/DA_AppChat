@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import { GoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -167,9 +167,9 @@ export function SignupForm({
 
               <div className="text-center text-sm">
                 Đã có tài khoản?{" "}
-                <a href="/signin" className="underline underline-offset-4">
+                <Link to="/signin" className="underline underline-offset-4">
                   Đăng nhập
-                </a>
+                </Link>
               </div>
             </div>
           </form>

@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router'
+import { HashRouter, Route, Routes } from 'react-router'
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -16,7 +16,7 @@ function App() {
   return (
     <>
     <Toaster richColors/>
-     <BrowserRouter>
+     <HashRouter>
      <Routes>
       {/* public routes */}
       <Route
@@ -47,7 +47,7 @@ function App() {
         </Route>
       </Route>
      </Routes>
-     </BrowserRouter>
+     </HashRouter>
     </>
   )
 }

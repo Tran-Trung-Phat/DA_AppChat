@@ -20,7 +20,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -129,6 +129,7 @@ function PersonRow({
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const navigate = useNavigate();
   const { user, signOut, updateProfile, uploadAvatar, changePassword } = useAuthStore();
   const {
     conversations,
@@ -599,7 +600,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      onClick={() => startDirectConversation(friend._id)}
+                      onClick={async () => {
+                        await startDirectConversation(friend._id);
+                        navigate("/");
+                      }}
                       title="Nhắn tin"
                     >
                       <MessageCircleIcon />

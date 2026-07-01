@@ -159,4 +159,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ loading: false });
     }
   },
+
+  setUser: (user) => {
+    set({ user });
+  },
 }));

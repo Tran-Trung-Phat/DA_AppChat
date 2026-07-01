@@ -337,7 +337,7 @@ const FeedPage = () => {
   // Lightbox Story Viewer states
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   const [storyViewerOpen, setStoryViewerOpen] = React.useState(false);
-  const storyProgressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const storyProgressTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const [storyProgress, setStoryProgress] = React.useState(0);
 
   // Separate Stories (24h) and Posts (permanent)

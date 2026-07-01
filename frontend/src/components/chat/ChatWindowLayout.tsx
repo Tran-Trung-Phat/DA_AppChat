@@ -383,7 +383,7 @@ const ChatWindowLayout = () => {
   const [recordingDuration, setRecordingDuration] = React.useState(0);
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
   const audioStreamRef = React.useRef<MediaStream | null>(null);
-  const recordingIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const recordingIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const audioChunksRef = React.useRef<Blob[]>([]);
 
   const startRecording = async () => {

@@ -16,5 +16,5 @@ export interface AuthState {
   uploadAvatar: (file: File) => Promise<boolean>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
   googleSignIn: (credential: string) => Promise<boolean>;
-
+  setUser: (user: User | null) => void;
 }

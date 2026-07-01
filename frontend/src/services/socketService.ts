@@ -20,6 +20,18 @@ type ServerToClientEvents = {
   "presence:changed": (payload: { userId: string; online: boolean }) => void;
   "typing:start": (payload: { conversationId: string; userId: string }) => void;
   "typing:stop": (payload: { conversationId: string; userId: string }) => void;
+  "call:incoming": (payload: {
+    fromUserId: string;
+    fromUser: any;
+    signalData: any;
+    callType: "audio" | "video";
+  }) => void;
+  "call:accepted": (payload: { signalData: any }) => void;
+  "call:declined": () => void;
+  "call:ice-candidate": (payload: { candidate: any }) => void;
+  "call:ended": () => void;
+  "call:busied": () => void;
+  "call:failed": (payload: { reason: string }) => void;
 };
 
 type ClientToServerEvents = {
@@ -27,6 +39,16 @@ type ClientToServerEvents = {
   "conversation:leave": (conversationId: string) => void;
   "typing:start": (conversationId: string) => void;
   "typing:stop": (conversationId: string) => void;
+  "call:ice-candidate": (payload: { toUserId: string; candidate: any }) => void;
+  "call:initiate": (payload: {
+    toUserId: string;
+    signalData: any;
+    callType: "audio" | "video";
+  }) => void;
+  "call:accept": (payload: { toUserId: string; signalData: any }) => void;
+  "call:decline": (payload: { toUserId: string }) => void;
+  "call:end": (payload: { toUserId: string }) => void;
+  "call:busy": (payload: { toUserId: string }) => void;
 };
 
 let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;

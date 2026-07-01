@@ -12,6 +12,8 @@ import {
   PhoneIcon,
   BookOpenIcon,
   LoaderCircleIcon,
+  Heart as HeartIcon,
+  Send as SendIcon,
 } from "lucide-react";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import {
@@ -22,6 +24,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -30,6 +33,7 @@ import { friendService } from "@/services/friendService";
 import { userService, type UserProfileResponse } from "@/services/userService";
 import CallOverlay from "@/components/chat/CallOverlay";
 import type { Story } from "@/types/chat";
+import api from "@/lib/axios";
 
 // Helper components & functions from FeedPage
 const initials = (name?: string) =>
@@ -242,7 +246,7 @@ function ProfilePostCard({
           <form onSubmit={handleSubmitComment} className="flex items-center gap-2">
             <Input
               value={commentDraft}
-              onChange={(e) => setCommentDraft(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCommentDraft(e.target.value)}
               placeholder="Viết bình luận..."
               className="flex-1 h-8 text-xs"
             />
